@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>낙화검심 - 꽃은 지고, 검은 남는다</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- AUTH OVERLAY -->
+<div id="auth-overlay">
+    <div id="auth-box">
+        <h2>낙화검심</h2>
+        <div class="sub">꽃은 지고, 검은 남는다</div>
+
+        <!-- Login -->
+        <div id="login-form">
+            <input id="login-user" placeholder="이름" autocomplete="off">
+            <input id="login-pass" type="password" placeholder="비밀번호">
+            <button onclick="login()">강호로 들어가기</button>
+            <div class="switch" onclick="toggleAuth()">처음 강호에 오셨나요? <span>회원가입</span></div>
+        </div>
+
+        <!-- Signup -->
+        <div id="signup-form" style="display:none">
+            <input id="signup-user" placeholder="이름">
+            <input id="signup-email" placeholder="이메일">
+            <input id="signup-pass" type="password" placeholder="비밀번호">
+            <button onclick="signup()">가입하고 강호로</button>
+            <div class="switch" onclick="toggleAuth()">이미 무인이신가요? <span>로그인</span></div>
+        </div>
+    </div>
+</div>
+
+<!-- CHAR SELECT OVERLAY -->
+<div id="char-select" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:999; align-items:center; justify-content:center;">
+    <div id="auth-box">
+        <h2>캐릭터 선택</h2>
+        <div class="sub">누구로 강호를 누비시겠습니까</div>
+        <div id="char-list"></div>
+        <button onclick="showNewChar()" style="margin-top:16px; background:transparent; border:1px dashed rgba(232,146,168,0.2);">+ 새 캐릭터 만들기</button>
+        <div id="new-char-form">
+            <label>이름 (2~6자)</label>
+            <input id="char-name" placeholder="예) 풍운, 설화...">
+            <label>출신</label>
+            <select id="char-origin">
+                <option>떠돌이 고아</option>
+                <option>몰락세가 후예</option>
+                <option>하급 문파 외문제자</option>
+                <option>상단 호위무사</option>
+                <option>관가 추방검객</option>
+                <option>의문의 기억상실자</option>
+            </select>
+            <div class="attr-grid" style="margin-bottom:10px">
+                <span>근골</span><input id="physique" type="range" min="1" max="20" value="10" oninput="document.getElementById('pv').textContent=this.value"><span id="pv">10</span>
+                <span>기맥</span><input id="ki" type="range" min="1" max="20" value="10" oninput="document.getElementById('kv').textContent=this.value"><span id="kv">10</span>
+                <span>신법</span><input id="agility" type="range" min="1" max="20" value="10" oninput="document.getElementById('av').textContent=this.value"><span id="av">10</span>
+                <span>심안</span><input id="insight" type="range" min="1" max="20" value="10" oninput="document.getElementById('iv').textContent=this.value"><span id="iv">10</span>
+                <span>매력</span><input id="charm" type="range" min="1" max="20" value="10" oninput="document.getElementById('cv').textContent=this.value"><span id="cv">10</span>
+                <span>복운</span><input id="luck" type="range" min="1" max="20" value="10" oninput="document.getElementById('lv').textContent=this.value"><span id="lv">10</span>
+            </div>
+            <button onclick="createChar()">캐릭터 생성</button>
+        </div>
+    </div>
+</div>
+
+<!-- GAME UI -->
+<div id="game-ui" style="display:none; height:100vh; flex-direction:column;">
+    <!-- TOP BAR -->
+    <div id="topbar">
+        <span class="title">낙화검심</span>
+        <span class="subtitle">꽃은 지고, 검은 남는다</span>
+        <div class="spacer"></div>
+        <div class="info">
+            <span id="top-region">입문마을</span>
+            <span id="top-room">장터</span>
+            <span id="top-time">정오</span>
+            <span><span class="dot online"></span> 접속중</span>
+            <span class="char-name" id="top-char">-</span>
+        </div>
+    </div>
+
+    <!-- MAIN -->
+    <div id="main">
+        <!-- LEFT -->
+        <div id="left-panel">
+            <h3>상태</h3>
+            <div class="stat-row"><span>체력</span><span class="val cherry" id="stat-hp">100/100</span></div>
+            <div class="hp-bar-bg"><div class="hp-bar" id="hp-bar" style="width:100%"></div></div>
+            <div class="stat-row"><span>내공</span><span class="val gold" id="stat-mp">50/50</span></div>
+            <div class="mp-bar-bg"><div class="mp-bar" id="mp-bar" style="width:100%"></div></div>
+            <div class="stat-row"><span>경지</span><span class="val cherry" id="stat-stage">입문</span></div>
+            <div class="stat-row"><span>레벨</span><span class="val" id="stat-level">1</span></div>
+            <div class="stat-row"><span>경험치</span><span class="val" id="stat-exp">0</span></div>
+            <h3 style="margin-top:8px">자질</h3>
+            <div class="attr-grid" id="attr-grid"></div>
+        </div>
+
+        <!-- CENTER -->
+        <div id="center-panel">
+            <div id="log-container">
+                <div class="log-line system">낙화검심에 오신 것을 환영합니다. 'help'를 입력하여 명령어를 확인하세요.</div>
+            </div>
+            <div id="command-bar">
+                <span class="prompt">▸</span>
+                <input id="command-input" placeholder="명령을 입력하세요..." autofocus>
+                <div class="quick-btns">
+                    <button onclick="sendCmd('look')">살펴보기</button>
+                    <button onclick="sendCmd('북')">북</button>
+                    <button onclick="sendCmd('남')">남</button>
+                    <button onclick="sendCmd('동')">동</button>
+                    <button onclick="sendCmd('서')">서</button>
+                    <button onclick="sendCmd('status')">상태</button>
+                    <button onclick="sendCmd('help')">도움말</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT -->
+        <div id="right-panel">
+            <div id="right-tabs">
+                <button class="active" onclick="switchTab('chat')">강호채팅</button>
+                <button onclick="switchTab('players')">주변인물</button>
+                <button onclick="switchTab('help')">명령어</button>
+            </div>
+            <div id="right-content">
+                <div class="tab-panel active" id="panel-chat">
+                    <div id="chat-messages"></div>
+                    <div id="chat-input-row">
+                        <input id="chat-input" placeholder="채팅...">
+                        <button onclick="sendChat()">전송</button>
+                    </div>
+                </div>
+                <div class="tab-panel" id="panel-players">
+                    <div class="players-list"><div style="color:var(--text-dim)">아직 아무도 없습니다...</div></div>
+                </div>
+                <div class="tab-panel" id="panel-help">
+                    <div class="log-line system" style="white-space:pre-line">
+[명령어]
+look / 보기       둘러보기
+북/남/동/서       이동
+attack 대상       공격
+talk 대상         대화
+status / 상태     캐릭터 정보
+chat 메시지       전체 채팅
+save / 저장       저장
+help / 도움       도움말
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="js/game.js"></script>
+</body>
+</html>
