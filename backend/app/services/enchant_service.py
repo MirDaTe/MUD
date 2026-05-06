@@ -148,7 +148,7 @@ def _get_stat_key(item_type: str) -> str:
     return {"weapon": "attack", "armor": "defense", "accessory": "hp"}.get(item_type, "attack")
 
 
-def _get_char_attr(char: Character, key: str) -> int | None:
+def _get_char_attr(char: Character, key: str) -> Optional[int]:
     return getattr(char, key, None)
 
 
