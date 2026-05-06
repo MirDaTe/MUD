@@ -10,16 +10,16 @@ class Character(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     name = Column(String(30), nullable=False)
 
-    # ── 신분 / 자질 ──
-    origin = Column(String(20), nullable=False)    # 떠돌이 고아, 몰락세가 후예 ...
-    physique = Column(Integer, default=10)          # 근골
-    ki = Column(Integer, default=10)                # 기맥
-    agility = Column(Integer, default=10)           # 신법
-    insight = Column(Integer, default=10)           # 심안
-    charm = Column(Integer, default=10)             # 매력
-    luck = Column(Integer, default=10)              # 복운
+    # 신분 / 자질
+    origin = Column(String(20), nullable=False)
+    physique = Column(Integer, default=10)
+    ki = Column(Integer, default=10)
+    agility = Column(Integer, default=10)
+    insight = Column(Integer, default=10)
+    charm = Column(Integer, default=10)
+    luck = Column(Integer, default=10)
 
-    # ── 전투 스탯 ──
+    # 전투 스탯
     hp = Column(Integer, default=100)
     max_hp = Column(Integer, default=100)
     mp = Column(Integer, default=50)
@@ -29,24 +29,35 @@ class Character(Base):
     speed = Column(Integer, default=10)
     crit_rate = Column(Float, default=0.05)
 
-    # ── 경험치 / 레벨 ──
+    # 경험치 / 레벨 / 경제
     exp = Column(Integer, default=0)
     level = Column(Integer, default=1)
+    gold = Column(Integer, default=100)  # 초기 지급 골드
 
-    # ── 위치 ──
+    # 위치
     current_room_id = Column(Integer, ForeignKey("rooms.id"), default=1)
 
-    # ── 무공 경지 ──
-    martial_stage = Column(String(20), default="입문")  # 입문→소성→대성→...
+    # 무공 경지
+    martial_stage = Column(String(20), default="입문")
 
-    # ── 성향 ──
-    righteousness = Column(Integer, default=0)  # 의
-    heroism = Column(Integer, default=0)        # 협
-    greed = Column(Integer, default=0)          # 욕
-    coldness = Column(Integer, default=0)       # 냉
-    madness = Column(Integer, default=0)        # 광
-    affection = Column(Integer, default=0)       # 정
+    # 성향
+    righteousness = Column(Integer, default=0)
+    heroism = Column(Integer, default=0)
+    greed = Column(Integer, default=0)
+    coldness = Column(Integer, default=0)
+    madness = Column(Integer, default=0)
+    affection = Column(Integer, default=0)
+
+    # 인벤토리 제한
+    inventory_limit = Column(Integer, default=30)  # 최대 30칸 (장착중 포함)
+
+    # 길드 버프 적용 여부 (캐릭터에 영구 적용)
+    guild_buff_attack = Column(Integer, default=0)
+    guild_buff_defense = Column(Integer, default=0)
+    guild_buff_hp = Column(Integer, default=0)
+    guild_buff_mp = Column(Integer, default=0)
+    guild_buff_speed = Column(Integer, default=0)
+    guild_buff_crit = Column(Float, default=0.0)
 
     created_at = Column(DateTime, server_default=func.now())
-
     owner = relationship("User")
