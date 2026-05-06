@@ -76,6 +76,7 @@ async function loadChars() {
         `<div class="char-card" onclick="selectChar(${c.id})">
             <span class="cname">${c.name}</span>
             <span class="cinfo">${c.origin} | Lv.${c.level} | ${c.martial_stage}</span>
+            <button class="del-char-btn" onclick="event.stopPropagation();deleteChar(${c.id})" title="캐릭터 삭제">✕</button>
         </div>`
     ).join('');
 }
@@ -127,6 +128,15 @@ function showNewChar() {
         document.getElementById(id[0]+'v').textContent = DEFAULT_VAL;
     });
     document.getElementById('remain-pts').textContent = MAX_PTS - DEFAULT_VAL * 6;
+}
+
+async function deleteChar(id) {
+    if (!confirm('정말 이 캐릭터를 삭제하시겠습니까?\n삭제 후에는 복구할 수 없습니다.')) return;
+    const r = await fetch(`${API}/characters/${id}`, {
+        method: 'DELETE', headers: {'Authorization': `Bearer ${token}`}
+    });
+    if (!r.ok) return alert('삭제 실패');
+    loadChars();  // 목록 갱신
 }
 
 async function selectChar(id) {
@@ -271,9 +281,8 @@ function clearPetals() {
 }
 
 function transitionToGamePetals() {
-    // auth 페탈 → 인게임 페탈로 전환
+    // 인게임에서는 벚꽃 OFF
     clearPetals();
-    spawnPetals('ingame');
 }
 
 function transitionToAuthPetals() {

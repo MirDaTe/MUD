@@ -25,3 +25,14 @@ def create_character(db: Session, user_id: int, data: CharacterCreate) -> Charac
 
 def get_characters(db: Session, user_id: int) -> list[Character]:
     return db.query(Character).filter(Character.user_id == user_id).all()
+
+
+def delete_character(db: Session, user_id: int, char_id: int) -> bool:
+    char = db.query(Character).filter(
+        Character.id == char_id, Character.user_id == user_id
+    ).first()
+    if not char:
+        return False
+    db.delete(char)
+    db.commit()
+    return True
