@@ -1,6 +1,6 @@
-# ⚔️ 낙화검심 (Nakhwa Geomshim) v0.6.0
+# ⚔️ 낙화검심 (Nakhwa Geomshim) v0.6.2
 
-> **귀환과 장비의 시대** — MMO급 13슬롯 장비·귀환·대규모 월드 확장
+> **밸런스 대격변** — 레벨제 장비·현실 경제·몬스터 재배치
 
 무협 텍스트 기반 MMORPG 백엔드 서버입니다.  
 FastAPI + SQLAlchemy + SQLite 기반의 REST API & WebSocket 실시간 게임 시스템.

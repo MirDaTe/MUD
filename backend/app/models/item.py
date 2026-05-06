@@ -17,3 +17,4 @@ class Item(Base):
     price = Column(Integer, default=0)
     rarity = Column(Integer, default=1)  # 1-5
     stack_limit = Column(Integer, default=1)  # 최대 중첩 수 (장비=1, 소모품=100)
+    level_required = Column(Integer, default=1)  # 착용 요구 레벨

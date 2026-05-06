@@ -142,6 +142,11 @@ def equip_item(db: Session, char: Character, item_name: str) -> Optional[str]:
     if not item:
         return "아이템 정보를 찾을 수 없습니다."
 
+    # 레벨 요구 체크
+    lvl_req = getattr(item, "level_required", 1) or 1
+    if char.level < lvl_req:
+        return f"'{item.name}'은(는) Lv.{lvl_req} 이상만 장착할 수 있습니다. (현재 Lv.{char.level})"
+
     item_slot = (item.slot or "").strip()
     if not item_slot:
         return f"'{item.name}'은(는) 장착할 수 없는 아이템입니다."
