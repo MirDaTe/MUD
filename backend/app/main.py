@@ -7,7 +7,7 @@ from .core.database import engine, Base
 from .api.endpoints import auth, characters, game, admin
 from .ws.chat import router as ws_router
 
-app = FastAPI(title="낙화검심", version="0.6.1")
+app = FastAPI(title="낙화검심", version="0.6.2")
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,4 +31,4 @@ def startup():
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "name": "낙화검심", "version": "0.6.1"}
+    return {"status": "ok", "name": "낙화검심", "version": "0.6.2"}

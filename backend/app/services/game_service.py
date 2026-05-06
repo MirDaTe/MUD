@@ -18,7 +18,7 @@ from ..models.shop import Shop
 from ..models.faction import Faction
 from ..models.character_faction import CharacterFaction
 from ..models.user import User
-from .combat_service import attack_monster, cast_martial_art, meditate as meditate_service, check_stage_up
+from .combat_service import attack_monster, cast_martial_art, meditate as meditate_service, check_stage_up, auto_combat, try_flee
 from .enchant_service import upgrade_item
 from .admin_service import is_admin, admin_set_stat, admin_teleport, admin_give_item, get_all_users, get_all_characters, admin_list_rooms, admin_list_items, admin_get_item, admin_give_item_by_code
 from .guild_service import create_guild, join_guild, approve_application, leave_guild, kick_member, change_rank, get_guild_info, add_reputation, add_guild_gold, withdraw_guild_gold, deposit_to_storage, withdraw_from_storage, get_storage_contents
@@ -44,6 +44,7 @@ def normalize_verb(v, r):
         "out":"out","exit":"out","나가다":"out","퇴장":"out",
         "go":"go","이동":"go","가다":"go",
         "attack":"attack","공격":"attack","공":"attack","때리다":"attack",
+        "flee":"flee","도망":"flee","도망치다":"flee","f":"flee",
         "cast":"cast","무공":"cast","시전":"cast",
         "meditate":"meditate","명상":"meditate","수련":"meditate","운기":"meditate",
         "talk":"talk","대화":"talk","말":"talk","말걸기":"talk","이야기":"talk",
@@ -127,23 +128,85 @@ def execute_command(db, char, cmd):
         for mid in list(room.monster_ids or []):
             mon=db.query(Monster).filter(Monster.id==mid).first()
             if mon and mon.name.lower()==rest.lower():
-                m=attack_monster(db,char,mon)
-                if mon.hp<=0 and mid in (room.monster_ids or []):
-                    room.monster_ids.remove(mid); db.delete(mon); db.commit()
-                    add_reputation(db,char,10)
-                if char.hp<=0: char.hp=char.max_hp; char.current_room_id=1; db.commit(); m.append({"type":"system","content":"마을에서 깨어납니다...","style":"warning"})
-                _check_lv(db,char,m); return m
+                result = auto_combat(db, char, mon)
+                msgs = []
+                # 틱 로그 (최대 15개만 표시)
+                ticks = result.get("ticks", [])
+                if len(ticks) > 15:
+                    msgs.extend(ticks[:7])
+                    msgs.append({"type":"system","content":f"... 전투 중 ... ({len(ticks)}틱)", "style":"normal"})
+                    msgs.extend(ticks[-7:])
+                else:
+                    msgs.extend(ticks)
+
+                if result.get("death"):
+                    msgs.append({"type":"system","content":"💀 사망하여 마을에서 깨어납니다...","style":"warning"})
+                    return msgs
+
+                if result.get("victory"):
+                    mid_removed = mid in (room.monster_ids or [])
+                    if mid_removed:
+                        room.monster_ids.remove(mid)
+                        db.commit()
+                    msgs.append({"type":"system","content":"🎉 승리!","style":"critical"})
+                    # 전리품 요약
+                    exp_gain = result.get("exp_gain", 0)
+                    gold_gain = result.get("gold_gain", 0)
+                    msgs.append({"type":"system",
+                        "content": f"━━━━━━━━━━━━━━━━\\n📊 전투 결과\\n━━━━━━━━━━━━━━━━\\n⭐ 경험치 +{exp_gain} (총 {char.exp})\\n💰 은전 +{gold_gain} (총 {char.gold}은전)",
+                        "style":"normal"})
+                    # 드롭템
+                    drops = result.get("drops", [])
+                    for dr in drops:
+                        msgs.append(dr)
+                    if not drops:
+                        msgs.append({"type":"system","content":"📦 획득한 아이템이 없습니다.","style":"dim"})
+                    _check_lv(db, char, msgs)
+                    return msgs
+                return msgs
         return [{"type":"system","content":f"'{rest}' 없습니다.","style":"warning"}]
+
+    if v == "flee":
+        for mid in list(room.monster_ids or []):
+            mon=db.query(Monster).filter(Monster.id==mid).first()
+            if mon:
+                msgs = try_flee(db, char, mon)
+                return msgs
+        return [{"type":"system","content":"도망칠 적이 없습니다.","style":"warning"}]
 
     if v == "cast":
         for mid in list(room.monster_ids or []):
             mon=db.query(Monster).filter(Monster.id==mid).first()
             if mon:
-                m=cast_martial_art(db,char,rest,mon)
-                if mon.hp<=0 and mid in (room.monster_ids or []):
-                    room.monster_ids.remove(mid); db.delete(mon); db.commit()
-                    add_reputation(db,char,15)
-                _check_lv(db,char,m); return m
+                result = auto_combat(db, char, mon, use_martial=rest)
+                msgs = []
+                if result.get("msg"):
+                    msgs.append(result["msg"])
+                ticks = result.get("ticks", [])
+                if len(ticks) > 10:
+                    msgs.extend(ticks[:5])
+                    msgs.append({"type":"system","content":f"... 전투 중 ... ({len(ticks)}틱)", "style":"normal"})
+                    msgs.extend(ticks[-5:])
+                else:
+                    msgs.extend(ticks)
+
+                if result.get("death"):
+                    msgs.append({"type":"system","content":"💀 사망하여 마을에서 깨어납니다...","style":"warning"})
+                    return msgs
+
+                if result.get("victory"):
+                    if mid in (room.monster_ids or []):
+                        room.monster_ids.remove(mid); db.commit()
+                    msgs.append({"type":"system","content":"🎉 승리!","style":"critical"})
+                    exp_gain = result.get("exp_gain", 0)
+                    gold_gain = result.get("gold_gain", 0)
+                    msgs.append({"type":"system",
+                        "content": f"━━━━━━━━━━━━━━━━\\n📊 전투 결과\\n━━━━━━━━━━━━━━━━\\n⭐ 경험치 +{exp_gain}\\n💰 은전 +{gold_gain}",
+                        "style":"normal"})
+                    for dr in result.get("drops", []): msgs.append(dr)
+                    if not result.get("drops"): msgs.append({"type":"system","content":"📦 획득한 아이템이 없습니다.","style":"dim"})
+                    _check_lv(db, char, msgs)
+                return msgs
         return [{"type":"system","content":"적이 없습니다.","style":"warning"}]
 
     if v == "meditate": m=meditate_service(db,char); _check_lv(db,char,m); return m
@@ -438,10 +501,7 @@ def _build_help(is_admin_user: bool) -> str:
 
     battle = """
 [전투]
-• attack 대상 / 공격 대상 — 대상을 기본 공격합니다.
-  예) attack 도적 → 도적을 공격합니다.
-
-• cast 무공명 / 시전 무공명 / 무공 무공명 — 배운 무공을 시전합니다.
+• attack 대상 / 공격 대상 — 대상을 공격합니다 (자동 전투).\n  예) attack 도적 → 도적과 자동 전투를 시작합니다.\n\n• flee / 도망 / 도망치다 — 전투에서 도망칩니다.\n  예) flee → 30~85% 확률로 도망 (속도에 따라)\n\n• cast 무공명 / 시전 무공명 — 무공을 시전하고 자동 전투합니다.
   예) cast 벽력검법 → 벽력검법으로 적을 공격합니다.
 
 • meditate / 명상 / 수련 / 운기 — 명상으로 HP와 MP를 회복합니다.
