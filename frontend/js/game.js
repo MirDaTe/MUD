@@ -1,6 +1,7 @@
 /* 낙화검심 - Client logic */
-const API = 'http://localhost:8000/api';
-const WS_BASE = 'ws://localhost:8000/ws';
+const API_HOST = window.location.hostname;
+const API = `http://${API_HOST}:8000/api`;
+const WS_BASE = `ws://${API_HOST}:8000/ws`;
 let token = '';
 let username = '';
 let currentCharId = null;
