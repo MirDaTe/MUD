@@ -15,33 +15,39 @@ def seed():
     items = [
   {
     "id": 101,
+    "code": "CONS_ENCHANT_STONE",
     "name": "강화석",
     "item_type": "consumable",
     "sub_type": "재료",
     "price": 50,
     "rarity": 1,
+    "stack_limit": 100,
     "stats": "{\"heal_amount\": 0}",
     "effects": "\"\\uc544\\uc774\\ud15c \\uac15\\ud654\\uc5d0 \\uc0ac\\uc6a9\\ub418\\ub294 \\uae30\\ubcf8 \\uc7ac\\ub8cc.\"",
     "description": "아이템 강화에 사용되는 기본 재료."
   },
   {
     "id": 102,
+    "code": "CONS_PROTECT_STONE",
     "name": "보호석",
     "item_type": "consumable",
     "sub_type": "재료",
     "price": 200,
     "rarity": 2,
+    "stack_limit": 100,
     "stats": "{\"heal_amount\": 0}",
     "effects": "\"\\uac15\\ud654 \\uc2e4\\ud328 \\uc2dc \\uc544\\uc774\\ud15c \\ub808\\ubca8\\uc744 \\ubcf4\\ud638.\"",
     "description": "강화 실패 시 아이템 레벨을 보호."
   },
   {
     "id": 103,
+    "code": "CONS_ADVANCED_STONE",
     "name": "고급강화석",
     "item_type": "consumable",
     "sub_type": "재료",
     "price": 500,
     "rarity": 3,
+    "stack_limit": 100,
     "stats": "{\"heal_amount\": 0}",
     "effects": "\"\\uac15\\ud654 \\uc131\\uacf5\\ub960\\uc744 20% \\uc0c1\\uc2b9.\"",
     "description": "강화 성공률을 20% 상승."

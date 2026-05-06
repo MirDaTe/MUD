@@ -1,5 +1,5 @@
 
-from sqlalchemy import Column, Integer, String, Float, JSON
+from sqlalchemy import Column, Integer, String, Float, JSON, Boolean
 from ..core.database import Base
 
 class Monster(Base):
@@ -15,8 +15,16 @@ class Monster(Base):
     speed = Column(Integer, default=8)
     exp_reward = Column(Integer, default=20)
 
-    # 드랍 아이템
+    # 드랍 아이템 (구버전 호환용)
     loot = Column(JSON, default=list)
+
+    # 레벨 기반 드롭테이블 시스템
+    min_level = Column(Integer, default=1)       # 최소 출현 레벨대
+    max_level = Column(Integer, default=999)     # 최대 출현 레벨대
+    drop_table = Column(JSON, default=list)      # [{"item_code":"WPN_...","rate":0.05,"min_qty":1,"max_qty":1}, ...]
+    is_boss = Column(Boolean, default=False)     # 보스 몬스터 여부
+    gold_reward = Column(Integer, default=0)     # 금화 보상
+    fame_reward = Column(Integer, default=0)     # 명성 보상
 
     # 전투 로그 템플릿 (공격/피격/사망)
     attack_templates = Column(JSON, default=list)

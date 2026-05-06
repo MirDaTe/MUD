@@ -172,8 +172,51 @@ def seed():
                 death_template="진시황이 '영원한 제국은... 없었던가...' 한탄하며 역사 속으로 사라집니다."),
     ]
 
+    # 몬스터 레벨 매핑 (seed_v6_monsters.py 기준)
+    monster_levels = {
+        26: (10,15), 27: (10,15), 28: (11,15), 29: (12,15), 30: (13,15), 31: (10,14), 32: (13,15), 33: (10,14),
+        34: (15,20), 35: (16,20), 36: (17,20), 37: (18,20),
+        38: (20,28), 39: (22,28), 40: (24,28), 41: (25,28),
+        42: (25,35), 43: (25,32), 44: (27,35), 45: (30,35),
+        46: (30,40), 47: (32,40), 48: (35,40),
+        49: (35,45), 50: (38,45), 51: (35,42), 52: (40,45),
+        53: (40,50), 54: (42,50), 55: (44,50), 56: (46,50),
+        57: (45,55), 58: (48,55), 59: (50,55),
+        60: (50,60), 61: (55,60),
+        62: (15,50), 63: (15,50),
+        # 보스
+        200: (15,20), 201: (20,25), 202: (22,28), 203: (25,35), 204: (30,40),
+        205: (35,45), 206: (40,50), 207: (45,55), 208: (50,60),
+        209: (30,50), 210: (55,80), 211: (80,120), 212: (60,90),
+        213: (40,65), 214: (200,300), 215: (55,80), 216: (35,55),
+        217: (65,95), 218: (120,180), 219: (250,400),
+    }
+
     for m in monsters:
-        db.add(m)
+        lv_info = monster_levels.get(m.id, (m.min_level or 10, m.max_level or (m.min_level or 10)+10))
+        lv, max_lv = lv_info
+        m.min_level = lv
+        m.max_level = max_lv
+
+        # 드롭테이블 생성
+        enchant_rate = min(0.30, 0.05 + lv * 0.001)
+        protect_rate = min(0.15, 0.01 + lv * 0.0005)
+        advanced_rate = min(0.08, lv * 0.0003)
+
+        dt = [
+            {"item_code": "CONS_HP_POT_M", "rate": 0.12, "min_qty": 1, "max_qty": 2},
+            {"item_code": "CONS_ENCHANT_STONE", "rate": round(enchant_rate, 4), "min_qty": 1, "max_qty": 3},
+            {"item_code": "CONS_PROTECT_STONE", "rate": round(protect_rate, 4), "min_qty": 1, "max_qty": 2},
+            {"item_code": "CONS_ADVANCED_STONE", "rate": round(advanced_rate, 4), "min_qty": 1, "max_qty": 1},
+        ]
+
+        # 보스 몬스터 (min_level >= 200 or id in 200-219) 희귀 장비 추가
+        if lv >= 200 or (200 <= m.id <= 219):
+            dt.append({"item_code": "ARM_CHEST_봉황갑옷", "rate": 0.12, "min_qty": 1, "max_qty": 1})
+            dt.append({"item_code": "WPN_SWORD_뇌전검", "rate": 0.10, "min_qty": 1, "max_qty": 1})
+            dt.append({"item_code": "ARM_HEAD_봉황관", "rate": 0.10, "min_qty": 1, "max_qty": 1})
+
+        m.drop_table = dt
     db.commit(); db.close()
     print(f"Seeded {len(monsters)} monsters! (Total: 145+)")
 

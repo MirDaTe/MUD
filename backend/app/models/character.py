@@ -33,9 +33,11 @@ class Character(Base):
     exp = Column(Integer, default=0)
     level = Column(Integer, default=1)
     gold = Column(Integer, default=100)  # 초기 지급 골드
+    max_gold = Column(Integer, default=9999999999)  # 소지금 상한
 
-    # 위치
+    # 위치 / 귀환
     current_room_id = Column(Integer, ForeignKey("rooms.id"), default=1)
+    return_room_id = Column(Integer, nullable=True)  # 귀환 지정 방 (NULL=미지정)
 
     # 무공 경지
     martial_stage = Column(String(20), default="입문")

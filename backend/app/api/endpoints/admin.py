@@ -6,7 +6,8 @@ from ...core.database import get_db
 from ...core.security import decode_access_token
 from ...services.admin_service import (
     is_admin, promote_to_admin, get_all_users, get_all_characters,
-    admin_set_stat, admin_teleport, admin_give_item, admin_list_rooms
+    admin_set_stat, admin_teleport, admin_give_item, admin_list_rooms,
+    admin_list_items, admin_get_item, admin_give_item_by_code
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -91,8 +92,41 @@ def give_item(char_id: int, item_id: int, quantity: int = 1, db: Session = Depen
 
 
 @router.get("/rooms")
-def list_rooms(db: Session = Depends(get_db), auth: tuple = Depends(admin_required)):
+def list_rooms(region: str = None, is_safe: bool = None, is_inn: bool = None,
+               db: Session = Depends(get_db), auth: tuple = Depends(admin_required)):
     uid, _ = auth
     if not is_admin(db, uid):
         raise HTTPException(status_code=403)
-    return admin_list_rooms(db)
+    return admin_list_rooms(db, region=region, is_safe=is_safe, is_inn=is_inn)
+
+
+@router.get("/items")
+def list_items(search: str = None, item_type: str = None,
+               db: Session = Depends(get_db), auth: tuple = Depends(admin_required)):
+    uid, _ = auth
+    if not is_admin(db, uid):
+        raise HTTPException(status_code=403)
+    return admin_list_items(db, search=search, item_type=item_type)
+
+
+@router.get("/items/{item_id}")
+def get_item(item_id: int, db: Session = Depends(get_db), auth: tuple = Depends(admin_required)):
+    uid, _ = auth
+    if not is_admin(db, uid):
+        raise HTTPException(status_code=403)
+    info = admin_get_item(db, item_id)
+    if not info:
+        raise HTTPException(status_code=404, detail="아이템을 찾을 수 없습니다.")
+    return info
+
+
+@router.post("/char/{char_id}/givecode")
+def give_item_by_code(char_id: int, item_code: str, quantity: int = 1,
+                       db: Session = Depends(get_db), auth: tuple = Depends(admin_required)):
+    uid, _ = auth
+    if not is_admin(db, uid):
+        raise HTTPException(status_code=403)
+    err = admin_give_item_by_code(db, char_id, item_code, quantity)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    return {"status": "ok"}

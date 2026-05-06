@@ -1,5 +1,5 @@
 
-from sqlalchemy import Column, Integer, String, JSON
+from sqlalchemy import Column, Integer, String, Boolean, JSON
 from ..core.database import Base
 
 class Room(Base):
@@ -18,3 +18,9 @@ class Room(Base):
 
     # 지역 분류
     region = Column(String(50), default="입문마을")
+
+    # 안전지역 여부 (전투 불가)
+    is_safe = Column(Boolean, default=False)
+
+    # 여관 여부 (귀환장소 지정 가능)
+    is_inn = Column(Boolean, default=False)

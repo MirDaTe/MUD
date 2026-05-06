@@ -6,6 +6,8 @@ from ..models.character import Character
 from ..models.monster import Monster
 from ..models.martial_art import MartialArt
 from ..models.character_martial_art import CharacterMartialArt
+from ..models.item import Item
+from ..models.inventory import Inventory
 
 # 경지별 위력 계수
 STAGE_MULTIPLIER = {
@@ -135,6 +137,65 @@ def check_stage_up(db: Session, char: Character) -> _Optional[str]:
     return None
 
 
+def _process_drops(db: Session, char: Character, monster: Monster) -> list[str]:
+    """drop_table 기반 아이템 드롭 처리"""
+    drop_messages = []
+    if not monster.drop_table:
+        return drop_messages
+
+    for drop_entry in monster.drop_table:
+        item_code = drop_entry.get("item_code", "")
+        rate = drop_entry.get("rate", 0)
+        min_qty = drop_entry.get("min_qty", 1)
+        max_qty = drop_entry.get("max_qty", 1)
+
+        # 확률 체크
+        if random.random() >= rate:
+            continue
+
+        # Item 검색
+        item = db.query(Item).filter(Item.code == item_code).first()
+        if not item:
+            continue
+
+        # 수량 결정
+        qty = random.randint(min_qty, max_qty)
+
+        # 인벤토리 용량 체크
+        current_items = db.query(Inventory).filter(
+            Inventory.character_id == char.id,
+            Inventory.equipped == 0
+        ).count()
+        if current_items >= char.inventory_limit:
+            drop_messages.append("인벤토리가 가득 차서 아이템을 획득하지 못했습니다")
+            continue
+
+        # 이미 같은 아이템이 있고 stack_limit > 1 이면 중첩
+        existing = db.query(Inventory).filter(
+            Inventory.character_id == char.id,
+            Inventory.item_id == item.id,
+            Inventory.equipped == 0
+        ).first()
+        if existing and item.stack_limit > 1:
+            existing.quantity = min(existing.quantity + qty, item.stack_limit)
+            drop_messages.append(f"{item.name} x{qty} 획득! (총 {existing.quantity}개)")
+        else:
+            if current_items >= char.inventory_limit:
+                drop_messages.append("인벤토리가 가득 차서 아이템을 획득하지 못했습니다")
+                continue
+            inv = Inventory(
+                character_id=char.id,
+                item_id=item.id,
+                quantity=qty,
+                equipped=0,
+                slot=""
+            )
+            db.add(inv)
+            drop_messages.append(f"{item.name} x{qty} 획득!")
+
+    return drop_messages
+
+
 def attack_monster(db: Session, char: Character, monster: Monster) -> list[dict]:
     """기본 공격"""
     messages = []
@@ -151,7 +212,23 @@ def attack_monster(db: Session, char: Character, monster: Monster) -> list[dict]
     if monster.hp <= 0:
         death_msg = monster.death_template or f"{monster.name}(이)가 쓰러집니다."
         messages.append({"type": "battle_log", "content": death_msg, "style": "battle"})
+
+        # 경험치 보상
         char.exp += monster.exp_reward
+
+        # 금화 보상
+        if monster.gold_reward:
+            char.gold = min(char.gold + monster.gold_reward, char.max_gold)
+            messages.append({"type": "battle_log", "content": f"💰 {monster.gold_reward} 금화를 획득했습니다!", "style": "system"})
+
+        # 드롭테이블 처리
+        drop_msgs = _process_drops(db, char, monster)
+        for dm in drop_msgs:
+            messages.append({"type": "battle_log", "content": dm, "style": "system"})
+
+        # 명성 보상 (TODO: Character에 fame 필드가 없으므로 로그만 출력)
+        if monster.fame_reward:
+            messages.append({"type": "battle_log", "content": f"✨ 명성 +{monster.fame_reward} 상승!", "style": "system"})
     else:
         # 반격
         m_dmg = max(1, monster.attack - char.defense + random.randint(-2, 2))
