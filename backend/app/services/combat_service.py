@@ -8,6 +8,18 @@ from ..models.item import Item
 from ..models.inventory import Inventory
 
 
+def _has_batchim(word: str) -> bool:
+    """한국어 단어의 마지막 글자에 받침이 있는지 확인"""
+    if not word:
+        return False
+    last_char = word[-1]
+    code = ord(last_char)
+    # 한글 범위 체크 (가 ~ 힣)
+    if 0xAC00 <= code <= 0xD7A3:
+        return (code - 0xAC00) % 28 != 0
+    return False
+
+
 def attack_monster(db: Session, char: Character, mon: Monster) -> list:
     """단일 전투 틱: 캐릭터 → 몬스터 공격 후 몬스터 반격. 메시지 리스트 반환."""
     msgs = []
@@ -20,11 +32,26 @@ def attack_monster(db: Session, char: Character, mon: Monster) -> list:
     dmg = max(1, dmg - mon.defense // 2)
     mon.hp = max(0, mon.hp - dmg)
 
+    # 일반 공격 어구
+    normal_adv = [
+        "날렵하게", "힘차게", "재빠르게", "예리하게", "거칠게",
+        "가볍게", "날카롭게", "단호하게", "침착하게", "매섭게",
+        "신속하게", "간결하게", "묵직하게", "정확하게", "대담하게",
+    ]
+    # 치명타 어구 (강한 느낌만)
+    crit_adv = [
+        "사정없이", "강렬하게", "맹렬하게", "파괴적으로", "압도적으로",
+        "작렬하는", "폭발적으로", "처절하게", "무시무시하게", "통렬하게",
+        "우렁차게", "섬뜩하게", "비장하게", "짐승처럼", "번개처럼",
+    ]
+
+    adv = random.choice(crit_adv) if crit else random.choice(normal_adv)
     crit_text = " 💥치명타!" if crit else ""
+    target_eul = f"{mon.name}을" if _has_batchim(mon.name) else f"{mon.name}를"
     msgs.append({
         "type": "battle_log",
-        "content": f"⚔️ {mon.name}(을)를 공격! —{dmg} 피해{crit_text} (적HP {mon.hp}/{mon.max_hp})",
-        "style": "attack"
+        "content": f"⚔️ 당신이 {adv} {target_eul} 공격! —{dmg} 피해{crit_text} (적HP {mon.hp}/{mon.max_hp})",
+        "style": "critical" if crit else "attack"
     })
 
     if mon.hp <= 0:
