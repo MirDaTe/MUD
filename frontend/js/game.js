@@ -395,7 +395,7 @@ function setupAutocomplete() {
         });
     });
     
-    // Tab 키로 자동완성
+    // 키보드 이벤트: Tab 자동완성 + Enter 실행 + ↑↓ 히스토리
     input.addEventListener('keydown', function(e) {
         if (e.key === 'Tab' && autocompleteVisible) {
             e.preventDefault();
@@ -405,17 +405,25 @@ function setupAutocomplete() {
                 dropdown.style.display = 'none';
                 autocompleteVisible = false;
             }
+            return;
         }
         
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            sendCmd();
+            return;
+        }
+
         // 명령어 기록 (위/아래 화살표)
         if (e.key === 'ArrowUp') {
+            e.preventDefault();
             if (cmdHistory.length > 0) {
                 cmdHistoryIdx = Math.max(0, cmdHistoryIdx - 1);
                 this.value = cmdHistory[cmdHistoryIdx];
             }
-            e.preventDefault();
         }
         if (e.key === 'ArrowDown') {
+            e.preventDefault();
             if (cmdHistory.length > 0 && cmdHistoryIdx < cmdHistory.length - 1) {
                 cmdHistoryIdx++;
                 this.value = cmdHistory[cmdHistoryIdx];
@@ -423,7 +431,6 @@ function setupAutocomplete() {
                 cmdHistoryIdx = cmdHistory.length;
                 this.value = '';
             }
-            e.preventDefault();
         }
     });
     
@@ -440,9 +447,6 @@ function setupAutocomplete() {
 document.addEventListener('DOMContentLoaded', () => {
     spawnPetals('');
     setupAutocomplete();
-    document.getElementById('command-input').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') sendCmd();
-    });
     document.getElementById('chat-input').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') sendChat();
     });
