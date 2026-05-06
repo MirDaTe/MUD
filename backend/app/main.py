@@ -29,6 +29,7 @@ app.include_router(ws_router, prefix="/ws")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "../../frontend")
 app.mount("/css", StaticFiles(directory=os.path.join(FRONTEND_DIR, "css")), name="css")
 app.mount("/js", StaticFiles(directory=os.path.join(FRONTEND_DIR, "js")), name="js")
+app.mount("/images", StaticFiles(directory=os.path.join(FRONTEND_DIR, "images")), name="images")
 
 from starlette.responses import FileResponse
 

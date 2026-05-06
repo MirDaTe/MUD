@@ -254,14 +254,15 @@ body {
 
 /* === AUTH OVERLAY === */
 #auth-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+    position: fixed; inset: 0; background: rgba(0,0,0,0.55);
     display: flex; align-items: center; justify-content: center;
-    z-index: 1000; backdrop-filter: blur(4px);
+    z-index: 1000; backdrop-filter: blur(2px);
 }
 #auth-box {
-    background: var(--bg-dark); border: 1px solid rgba(232,146,168,0.2);
+    background: rgba(26, 18, 31, 0.7); border: 1px solid rgba(232,146,168,0.25);
     padding: 40px; border-radius: 12px; width: 380px;
-    text-align: center;
+    text-align: center; backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 #auth-box h2 { color: var(--cherry); font-size: 28px; margin-bottom: 8px; }
 #auth-box .sub { color: var(--text-dim); font-size: 14px; margin-bottom: 24px; font-style: italic; }
@@ -304,15 +305,15 @@ body {
 }
 
 /* ═══════════════════════════════════════════
-   AUTH SCENE BACKGROUND — 무협 벚꽃 대결
+   AUTH SCENE BACKGROUND — 로그인 배경 이미지
    ═══════════════════════════════════════════ */
 #scene-bg {
     position: fixed; inset: 0; z-index: 0;
     pointer-events: none;
     opacity: 0;
     animation: scene-fade-in 2s ease-out 0.3s forwards;
+    background: url('/images/login-bg.jpg') center/cover no-repeat;
 }
-#scene-bg svg { width: 100%; height: 100%; }
 @keyframes scene-fade-in { to { opacity: 1; } }
 
 /* 벚꽃 입자 */
