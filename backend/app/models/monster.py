@@ -29,3 +29,8 @@ class Monster(Base):
     # 전투 로그 템플릿 (공격/피격/사망)
     attack_templates = Column(JSON, default=list)
     death_template = Column(String(500), default="")
+
+    # 리스폰 및 선공 설정
+    is_aggro = Column(Boolean, default=False)      # 선공 몬스터 여부
+    respawn_min = Column(Integer, default=30)       # 최소 리스폰 시간(초)
+    respawn_max = Column(Integer, default=120)      # 최대 리스폰 시간(초)

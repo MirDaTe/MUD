@@ -157,6 +157,11 @@ async function selectChar(id) {
     transitionToGamePetals();
     await sendCmd('look');
     connectChat();
+    // 명령 입력창에 자동 포커스
+    setTimeout(() => {
+        const cmdInput = document.getElementById('command-input');
+        if (cmdInput) cmdInput.focus();
+    }, 500);
 }
 
 // ─── GAME ───
@@ -164,6 +169,11 @@ async function sendCmd(cmd) {
     if (!currentCharId) return;
     if (!cmd) {
         cmd = document.getElementById('command-input').value;
+        if (cmd.trim()) {
+            cmdHistory.push(cmd.trim());
+            if (cmdHistory.length > 50) cmdHistory.shift();
+            cmdHistoryIdx = cmdHistory.length;
+        }
         document.getElementById('command-input').value = '';
         if (!cmd.trim()) return;
     }
@@ -307,9 +317,129 @@ function transitionToAuthPetals() {
     spawnPetals('');
 }
 
+// ─── AUTOCOMPLETE ───
+const COMMANDS = [
+    'look', '보기', '주변', '살펴보다',
+    'north', 'south', 'east', 'west', 'up', 'down',
+    '북', '남', '동', '서', '위', '아래',
+    'attack', '공격', '공', '때리다',
+    'talk', '대화', '말걸기', '이야기',
+    'shop', '상점', '물품',
+    'buy', '구매', '사다',
+    'sell', '판매', '팔다',
+    'status', '상태', '정보', '스탯',
+    'inv', '가방', '인벤', '소지품',
+    'eq', '장비', '장비창',
+    'equip', '장착', '착용',
+    'unequip', '해제', '장착해제',
+    'use', '사용하기', '먹다',
+    'enchant', '강화', '인챈트',
+    'cast', '무공', '시전',
+    'meditate', '명상', '수련', '운기',
+    'flee', '도망', '도망치다',
+    'map', '지도',
+    'help', '도움말', '?',
+    'save', '저장',
+    'dismantle', '분해',
+    'discard', '버리기', '버리다',
+    'gold', '돈', '은전', '소지금',
+    'quest', '퀘스트', '의뢰',
+    'return_set', '귀환지정',
+    'return_go', '귀환',
+    'arts', '무공목록', '배운무공',
+];
+
+let cmdHistory = [];
+let cmdHistoryIdx = -1;
+let autocompleteVisible = false;
+
+function setupAutocomplete() {
+    const input = document.getElementById('command-input');
+    if (!input) return;
+    
+    // 자동완성 드롭다운 컨테이너
+    let dropdown = document.getElementById('cmd-autocomplete');
+    if (!dropdown) {
+        dropdown = document.createElement('div');
+        dropdown.id = 'cmd-autocomplete';
+        dropdown.style.cssText = 'position:absolute; bottom:100%; left:0; right:0; background:#1a1220; border:1px solid rgba(232,146,168,0.3); border-radius:6px; max-height:200px; overflow-y:auto; display:none; z-index:100;';
+        input.parentElement.style.position = 'relative';
+        input.parentElement.appendChild(dropdown);
+    }
+    
+    input.addEventListener('input', function() {
+        const val = this.value.trim().toLowerCase();
+        if (!val || val.includes(' ')) {
+            dropdown.style.display = 'none';
+            autocompleteVisible = false;
+            return;
+        }
+        const matches = COMMANDS.filter(c => c.startsWith(val) && c !== val);
+        if (matches.length === 0) {
+            dropdown.style.display = 'none';
+            autocompleteVisible = false;
+            return;
+        }
+        dropdown.innerHTML = matches.map(c => `<div class="ac-item" data-cmd="${c}">${c}</div>`).join('');
+        dropdown.style.display = 'block';
+        autocompleteVisible = true;
+        
+        // 클릭 핸들러
+        dropdown.querySelectorAll('.ac-item').forEach(el => {
+            el.onclick = function() {
+                input.value = this.dataset.cmd + ' ';
+                dropdown.style.display = 'none';
+                autocompleteVisible = false;
+                input.focus();
+            };
+        });
+    });
+    
+    // Tab 키로 자동완성
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab' && autocompleteVisible) {
+            e.preventDefault();
+            const first = dropdown.querySelector('.ac-item');
+            if (first) {
+                this.value = first.dataset.cmd + ' ';
+                dropdown.style.display = 'none';
+                autocompleteVisible = false;
+            }
+        }
+        
+        // 명령어 기록 (위/아래 화살표)
+        if (e.key === 'ArrowUp') {
+            if (cmdHistory.length > 0) {
+                cmdHistoryIdx = Math.max(0, cmdHistoryIdx - 1);
+                this.value = cmdHistory[cmdHistoryIdx];
+            }
+            e.preventDefault();
+        }
+        if (e.key === 'ArrowDown') {
+            if (cmdHistory.length > 0 && cmdHistoryIdx < cmdHistory.length - 1) {
+                cmdHistoryIdx++;
+                this.value = cmdHistory[cmdHistoryIdx];
+            } else {
+                cmdHistoryIdx = cmdHistory.length;
+                this.value = '';
+            }
+            e.preventDefault();
+        }
+    });
+    
+    // 포커스 잃으면 드롭다운 숨김
+    input.addEventListener('blur', function() {
+        setTimeout(() => {
+            dropdown.style.display = 'none';
+            autocompleteVisible = false;
+        }, 200);
+    });
+}
+
 // ─── KEY HANDLER ───
 document.addEventListener('DOMContentLoaded', () => {
     spawnPetals('');
+    setupAutocomplete();
     document.getElementById('command-input').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') sendCmd();
     });

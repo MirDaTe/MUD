@@ -26,8 +26,8 @@
 
         <!-- Login -->
         <div id="login-form" style="opacity:0; animation: fade-up 0.6s ease-out 1.4s forwards;">
-            <input id="login-user" placeholder="이름" autocomplete="off">
-            <input id="login-pass" type="password" placeholder="비밀번호">
+            <input id="login-user" placeholder="이름" autocomplete="off" onkeydown="if(event.key==='Enter') login()">
+            <input id="login-pass" type="password" placeholder="비밀번호" onkeydown="if(event.key==='Enter') login()">
             <button onclick="login()">강호로 들어가기</button>
             <div class="switch" onclick="toggleAuth()">처음 강호에 오셨나요? <span>회원가입</span></div>
         </div>

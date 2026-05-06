@@ -50,7 +50,7 @@ def attack_monster(db: Session, char: Character, mon: Monster) -> list:
     return msgs
 
 
-def auto_combat(db: Session, char: Character, mon: Monster, use_martial: str = "") -> dict:
+def auto_combat(db: Session, char: Character, mon: Monster, use_martial: str = "", room_ids: Optional[list] = None) -> dict:
     """자동 전투: 전투 종료까지 틱 반복. 결과 요약 반환."""
     ticks = []
     initial_hp = char.hp
@@ -74,13 +74,23 @@ def auto_combat(db: Session, char: Character, mon: Monster, use_martial: str = "
     result = {"ticks": ticks, "victory": mon.hp <= 0, "death": False}
 
     if mon.hp <= 0:
+        # ── 리스폰 스케줄링 (몬스터 삭제 전 room 정보 저장) ──
+        if room_ids is None:
+            from ..models.room import Room
+            rooms = db.query(Room).filter(Room.monster_ids.contains(mon.id)).all()
+            room_ids = [r.id for r in rooms]
+
+        from .respawn_service import schedule_respawn
+        schedule_respawn(mon.id, room_ids)
+
         # ── 전리품 처리 ──
         drop_msgs = _process_drops(db, char, mon)
         result["drops"] = drop_msgs
 
-        # 경험치 + 골드
+        # 경험치 + 골드 — 개선된 계산식
         exp_gain = mon.exp_reward or (mon.max_hp // 2 + mon.attack * 3)
-        gold_gain = getattr(mon, "gold_reward", 0) or (mon.max_hp // 5)
+        exp_gain = int(exp_gain + (mon.max_hp * 0.5) + (mon.attack * 2))
+        gold_gain = getattr(mon, "gold_reward", 0) or (mon.max_hp // 3 + random.randint(0, mon.attack))
         char.exp += exp_gain
         char.gold = min(char.gold + gold_gain, getattr(char, "max_gold", 9999999999))
 
@@ -188,7 +198,7 @@ def _process_drops(db: Session, char: Character, mon: Monster) -> list:
 
         msgs.append({
             "type": "system",
-            "content": f"📦 {item.name} x{qty} 획득!",
+            "content": f"📦 {item.name} x{qty} 획득!{' ' + '⭐' * item.rarity if item.rarity > 1 else ''}",
             "style": "loot"
         })
 

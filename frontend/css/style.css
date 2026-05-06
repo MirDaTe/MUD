@@ -452,3 +452,57 @@ body.game-active .log-line.battle { color: #f0e8d8; }
 body.game-active .log-line.critical { color: #ffd080; }
 body.game-active .log-line.npc { color: #f0b8c8; }
 body.game-active .log-line.healing { color: #80d8a0; }
+
+/* ─── MAP ─── */
+.log-line.map {
+    background: rgba(232, 146, 168, 0.05);
+    border: 1px solid rgba(232, 146, 168, 0.15);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin: 4px 0;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre;
+}
+
+/* ─── NPC DIALOGUE ─── */
+.log-line.npc_dialogue {
+    background: rgba(240, 184, 200, 0.08);
+    border-left: 3px solid var(--cherry);
+    padding: 8px 12px;
+    margin: 4px 0;
+    border-radius: 0 6px 6px 0;
+    font-style: italic;
+}
+
+.log-line.loot {
+    color: #f0d080;
+}
+
+.log-line.attack {
+    color: #ff8a8a;
+}
+
+.log-line.defense {
+    color: #8ab4f8;
+}
+
+.log-line.special {
+    color: #c8a0ff;
+    text-shadow: 0 0 8px rgba(200, 160, 255, 0.3);
+}
+
+/* ─── AUTOCOMPLETE ITEMS ─── */
+.ac-item {
+    padding: 6px 14px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-family: var(--font-body);
+    transition: all 0.15s;
+}
+.ac-item:hover {
+    background: rgba(232, 146, 168, 0.15);
+    color: var(--cherry);
+}

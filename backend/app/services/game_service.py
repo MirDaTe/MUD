@@ -102,6 +102,18 @@ def execute_command(db, char, cmd):
 
     if v == "look":
         if not room: return [{"type":"system","content":"허공...","style":"normal"}]
+        # 신규 캐릭터 첫 look 시 배경 스토리 출력
+        if char.level == 1 and char.exp == 0 and char.current_room_id == 1:
+            msgs.append({"type": "system", "content": "=" * 40, "style": "room"})
+            msgs.append({"type": "system", "content": "⚔ 낙화검심 — 새로운 전설의 시작 ⚔", "style": "critical"})
+            msgs.append({"type": "system", "content": "=" * 40, "style": "room"})
+            msgs.append({"type": "room_desc", "content": "혼란의 무림, 강호는 피로 물들어 있다. 천하를 호령하던 구파일방은 귀화천의 음모로 무너졌고, 정파와 사파의 경계는 사라졌다.", "style": "room"})
+            msgs.append({"type": "room_desc", "content": "너는 이름 없던 자리에서 태어났다. 하지만 네 가슴 속에는 꺼지지 않는 불꽃이 있다. 최강의 영웅이 되어 무림을 재패하고, 잃어버린 평화를 되찾아라.", "style": "room"})
+            msgs.append({"type": "room_desc", "content": "길은 멀고 험난하지만, 그 끝에는 반드시 네가 서 있을 것이다.", "style": "room"})
+            msgs.append({"type": "system", "content": "-" * 40, "style": "dim"})
+            # 경험치를 1 주어 두 번 출력 안 되게
+            char.exp = 1
+            db.commit()
         msgs.append({"type":"room_desc","content":f"[{room.name}] (#{room.id})","style":"room"})
         msgs.append({"type":"room_desc","content":room.description,"style":"room"})
         ex={k:vv for k,vv in (room.exits or {}).items() if vv}
@@ -122,7 +134,67 @@ def execute_command(db, char, cmd):
             ds={"n":"north","s":"south","e":"east","w":"west","북":"north","남":"south","동":"east","서":"west","u":"up","d":"down"}.get(d,d)
         else: ds=v
         t=(room.exits or {}).get(ds) if room else None
-        if t: char.current_room_id=t; db.commit(); return msgs+execute_command(db,char,"look")
+        if t:
+            old_room_name = room.name if room else "알 수 없는 곳"
+            char.current_room_id = t
+            db.commit()
+            dir_korean = {"north":"북쪽","south":"남쪽","east":"동쪽","west":"서쪽","up":"위","down":"아래","enter":"안으로","out":"밖으로","go":"이동"}
+            msgs.append({"type":"system","content":f"🚶 {dir_korean.get(ds, ds)}으로 이동합니다...","style":"normal"})
+            # 새 방 정보
+            new_room = db.query(Room).filter(Room.id == t).first()
+            if new_room:
+                msgs.append({"type":"room_desc","content":f"[{new_room.name}] (#{new_room.id})","style":"room"})
+                msgs.append({"type":"room_desc","content":new_room.description,"style":"room"})
+                # NPC 행동 출력
+                for nid in (new_room.npc_ids or []):
+                    npc = db.query(NPC).filter(NPC.id==nid).first()
+                    if npc and npc.dialogue_options:
+                        actions = npc.dialogue_options
+                        action = random.choice(actions) if isinstance(actions, list) else actions
+                        if isinstance(action, dict):
+                            action_text = action.get("action", "")
+                        else:
+                            action_text = str(action)
+                        msgs.append({"type":"npc_present","content":f"  {npc.title or ''} {npc.name}: {action_text}","style":"npc"})
+                # 출구 표시
+                ex = {k:vv for k,vv in (new_room.exits or {}).items() if vv}
+                if ex:
+                    ko = {"north":"북","south":"남","east":"동","west":"서","up":"위","down":"아래","enter":"입장","out":"퇴장"}
+                    msgs.append({"type":"system","content":"갈 수 있는 곳: " + ", ".join(f"[{ko.get(k,k)}]" for k in ex),"style":"normal"})
+                # NPC/몬스터 존재 표시
+                for nid in (new_room.npc_ids or []):
+                    npc = db.query(NPC).filter(NPC.id==nid).first()
+                    if npc:
+                        title_str = f" [{npc.title}]" if npc.title else ""
+                        msgs.append({"type":"npc_present","content":f"  {npc.name}{title_str}(이)가 있습니다.","style":"npc"})
+                for mid in (new_room.monster_ids or []):
+                    mon = db.query(Monster).filter(Monster.id==mid).first()
+                    if mon:
+                        aggro_str = " ⚠️선공!" if getattr(mon, "is_aggro", False) else ""
+                        msgs.append({"type":"monster_present","content":f"⚠️ {mon.name}! (HP:{mon.hp}/{mon.max_hp}){aggro_str}","style":"warning"})
+                # ⚠️ 선공 몬스터 체크 — 자동 전투
+                for mid in list(new_room.monster_ids or []):
+                    mon = db.query(Monster).filter(Monster.id==mid).first()
+                    if mon and getattr(mon, "is_aggro", False):
+                        msgs.append({"type":"system","content":f"🔥 {mon.name}이(가) 당신을 발견하고 덤벼든다!","style":"warning"})
+                        from .combat_service import auto_combat
+                        result = auto_combat(db, char, mon, room_ids=[new_room.id])
+                        for tick in result.get("ticks", []):
+                            msgs.append(tick)
+                        if result.get("victory"):
+                            mid_removed = mid in (new_room.monster_ids or [])
+                            if mid_removed:
+                                new_room.monster_ids.remove(mid)
+                                db.commit()
+                            msgs.append({"type":"system","content":"🎉 전투 승리!","style":"critical"})
+                            exp_gain = result.get("exp_gain", 0)
+                            gold_gain = result.get("gold_gain", 0)
+                            msgs.append({"type":"system","content":f"⭐ 경험치 +{exp_gain}  💰 은전 +{gold_gain}","style":"normal"})
+                            for dr in result.get("drops", []):
+                                msgs.append(dr)
+                        elif result.get("death"):
+                            msgs.append({"type":"system","content":"💀 사망하여 마을에서 깨어납니다...","style":"warning"})
+            return msgs
         return [{"type":"system","content":"갈 수 없습니다.","style":"warning"}]
 
     if v == "attack":
@@ -213,10 +285,33 @@ def execute_command(db, char, cmd):
 
     if v == "meditate": m=meditate_service(db,char); _check_lv(db,char,m); return m
     if v == "talk":
+        target = rest.lower().strip()
+        found = []
         for nid in (room.npc_ids or []):
-            npc=db.query(NPC).filter(NPC.id==nid).first()
-            if npc and npc.name.lower()==rest.lower(): return [{"type":"npc_dialogue","content":npc.dialogue or f"[{npc.name}]: ...","style":"npc"}]
-        return [{"type":"system","content":"대화 상대 없음.","style":"warning"}]
+            npc = db.query(NPC).filter(NPC.id==nid).first()
+            if npc and (npc.name.lower() == target or target in npc.name.lower()):
+                found.append(npc)
+        if not found:
+            names = ", ".join([db.query(NPC).filter(NPC.id==nid).first().name for nid in (room.npc_ids or []) if db.query(NPC).filter(NPC.id==nid).first()])
+            return [{"type":"system","content":f"대화 상대 없음. 주변 NPC: {names or '없음'}","style":"warning"}]
+        npc = found[0]
+        lines = [f"── {npc.name} ──"]
+        if npc.title:
+            lines.append(f"[{npc.title}]")
+        if npc.occupation:
+            lines.append(f"직업: {npc.occupation}")
+        dialogue = npc.dialogue or f"[{npc.name}]: ..."
+        # dialogue_options가 있으면 추가 대화 표시
+        opts = getattr(npc, "dialogue_options", [])
+        if opts:
+            dialogue += f"\n\n[추가 대화]"
+            for i, opt in enumerate(opts[:3]):
+                if isinstance(opt, dict):
+                    dialogue += f"\n  {i+1}. {opt.get('question','')}"
+                else:
+                    dialogue += f"\n  {i+1}. {opt}"
+        msgs.append({"type":"npc_dialogue","content":dialogue,"style":"npc"})
+        return msgs
 
     if v == "status":
         fac=db.query(CharacterFaction).filter(CharacterFaction.character_id==char.id).first()
@@ -303,13 +398,37 @@ def execute_command(db, char, cmd):
         return [{"type":"system","content":e if e else f"{nm} 버림.","style":"warning" if e else "normal"}]
 
     if v == "shop":
-        shop=db.query(Shop).filter(Shop.room_id==char.current_room_id).first()
-        if not shop: return [{"type":"system","content":"상점 없음.","style":"warning"}]
-        lines=[f"[{shop.name}]"]
-        for iid in (shop.item_ids or [])[:15]:
-            it=db.query(ItemModel).filter(ItemModel.id==iid).first()
-            if it: lines.append(f"  {it.name} — {it.price}은전")
-        lines.append("'buy 아이템' / 'sell 아이템' / 'dismantle 아이템'")
+        shop = db.query(Shop).filter(Shop.room_id == char.current_room_id).first()
+        if not shop:
+            # NPC의 shop_id로도 검색
+            for nid in (room.npc_ids or []):
+                npc = db.query(NPC).filter(NPC.id == nid).first()
+                if npc and getattr(npc, "shop_id", None):
+                    shop = db.query(Shop).filter(Shop.id == npc.shop_id).first()
+                    if shop:
+                        break
+        if not shop:
+            return [{"type":"system","content":"이 곳에는 상점이 없습니다.","style":"warning"}]
+        # 상인 NPC 정보 표시
+        npc_name = ""
+        if shop.npc_id:
+            snpc = db.query(NPC).filter(NPC.id == shop.npc_id).first()
+            if snpc:
+                npc_name = f" [상인: {snpc.name}]"
+        lines = [f"━━━ {shop.name}{npc_name} ━━━"]
+        if shop.description:
+            lines.append(shop.description)
+        lines.append("─" * 20)
+        for iid in (shop.item_ids or []):
+            it = db.query(ItemModel).filter(ItemModel.id == iid).first()
+            if it:
+                rarity_str = "⭐" * min(it.rarity or 1, 5)
+                lvl_str = f" Lv.{it.level_required}" if it.level_required and it.level_required > 1 else ""
+                lines.append(f"  {rarity_str} {it.name}{lvl_str} — {it.price}은전")
+        if not shop.item_ids:
+            lines.append("  (품절)")
+        lines.append("─" * 20)
+        lines.append("'buy 아이템' 구매 | 'sell 아이템' 판매")
         return [{"type":"system","content":"\n".join(lines),"style":"normal"}]
 
     if v == "buy":
