@@ -165,8 +165,9 @@ async function selectChar(id) {
 }
 
 // ─── GAME ───
+let _sending = false;
 async function sendCmd(cmd) {
-    if (!currentCharId) return;
+    if (!currentCharId || _sending) return;
     if (!cmd) {
         cmd = document.getElementById('command-input').value;
         if (cmd.trim()) {
@@ -177,18 +178,19 @@ async function sendCmd(cmd) {
         document.getElementById('command-input').value = '';
         if (!cmd.trim()) return;
     }
+    _sending = true;
     addLog({type:'system', content:`▸ ${cmd}`, style:'system'});
     const r = await fetch(`${API}/game/cmd?char_id=${currentCharId}`, {
         method:'POST', headers:{'Authorization':`Bearer ${token}`, 'Content-Type':'application/json'},
         body: JSON.stringify({command: cmd})
     });
-    if (!r.ok) return;
+    if (!r.ok) { _sending = false; return; }
     const msgs = await r.json();
 
     // 전투 틱은 1초 간격으로, 나머지는 즉시 표시
     let i = 0;
     function showNext() {
-        if (i >= msgs.length) { updateStats(); return; }
+        if (i >= msgs.length) { updateStats(); _sending = false; return; }
         const m = msgs[i];
         i++;
         if (m.type === 'battle_log') {
@@ -367,7 +369,8 @@ function setupAutocomplete() {
         input.parentElement.appendChild(dropdown);
     }
     
-    input.addEventListener('input', function() {
+    // oninput으로 직접 설정 (중복 등록 방지)
+    input.oninput = function() {
         const val = this.value.trim().toLowerCase();
         if (!val || val.includes(' ')) {
             dropdown.style.display = 'none';
@@ -393,10 +396,10 @@ function setupAutocomplete() {
                 input.focus();
             };
         });
-    });
+    };
     
-    // 키보드 이벤트: Tab 자동완성 + Enter 실행 + ↑↓ 히스토리
-    input.addEventListener('keydown', function(e) {
+    // onkeydown으로 직접 설정 (중복 등록 방지) — Tab 자동완성 + Enter 실행 + ↑↓ 히스토리
+    input.onkeydown = function(e) {
         if (e.key === 'Tab' && autocompleteVisible) {
             e.preventDefault();
             const first = dropdown.querySelector('.ac-item');
@@ -432,15 +435,15 @@ function setupAutocomplete() {
                 this.value = '';
             }
         }
-    });
+    };
     
-    // 포커스 잃으면 드롭다운 숨김
-    input.addEventListener('blur', function() {
+    // onblur로 직접 설정 (중복 등록 방지)
+    input.onblur = function() {
         setTimeout(() => {
             dropdown.style.display = 'none';
             autocompleteVisible = false;
         }, 200);
-    });
+    };
 }
 
 // ─── KEY HANDLER ───
