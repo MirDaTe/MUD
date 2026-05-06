@@ -407,6 +407,10 @@ body.game-active::before {
     -webkit-mask-image: radial-gradient(ellipse at 50% 50%, black 30%, transparent 70%);
 }
 
+body.game-active #scene-bg {
+    display: none;
+}
+
 /* 인게임에서도 은은한 벚꽃 (게임 UI 방해 안 되게) */
 .petal.ingame {
     opacity: 0.25 !important;
