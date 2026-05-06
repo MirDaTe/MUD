@@ -58,6 +58,8 @@ function logout() {
     document.getElementById('auth-overlay').style.display = 'flex';
     document.getElementById('login-user').value = '';
     document.getElementById('login-pass').value = '';
+    const btn = document.getElementById('btn-logout');
+    if (btn) btn.style.display = 'none';
     document.body.classList.remove('game-active');
     transitionToAuthPetals();
 }
@@ -139,7 +141,8 @@ async function selectChar(id) {
         document.getElementById('top-char').textContent = c.name;
         document.getElementById('top-region').textContent = '';  // look에서 업데이트
     }
-    document.getElementById('btn-logout').style.display = 'inline-block';
+    const btn = document.getElementById('btn-logout');
+    if (btn) btn.style.display = 'inline-block';
     document.body.classList.add('game-active');
     transitionToGamePetals();
     await sendCmd('look');
