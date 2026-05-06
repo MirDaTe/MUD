@@ -78,6 +78,10 @@ async function loadChars() {
 async function createChar() {
     const name = document.getElementById('char-name').value.trim();
     if (!name || name.length < 2) return alert('이름을 입력하세요');
+    // 스탯 총합 검증 (정확히 MAX_PTS)
+    const total = STAT_IDS.reduce((sum, id) => sum + (+document.getElementById(id).value), 0);
+    const remain = MAX_PTS - total;
+    if (remain !== 0) return alert(`스탯 포인트를 모두 사용해주세요! (남은 포인트: ${remain})`);
     const data = {
         name, origin: document.getElementById('char-origin').value,
         physique: +document.getElementById('physique').value,
@@ -86,8 +90,7 @@ async function createChar() {
         insight: +document.getElementById('insight').value,
         charm: +document.getElementById('charm').value,
         luck: +document.getElementById('luck').value
-    };
-    const r = await fetch(`${API}/characters/`, {
+    };const r = await fetch(`${API}/characters/`, {
         method:'POST', headers:{'Authorization':`Bearer ${token}`, 'Content-Type':'application/json'},
         body: JSON.stringify(data)
     });
