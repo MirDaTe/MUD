@@ -248,7 +248,7 @@ function switchTab(tab) {
 
 // ─── PETALS (벚꽃 입자 애니메이션) ───
 function spawnPetals(cls = '') {
-    const PETALS = 25;
+    const PETALS = 50;
     const chars = ['🌸','💮','🌺','🏵','✿','❀'];
     const container = document.body;
     for (let i = 0; i < PETALS; i++) {

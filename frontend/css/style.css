@@ -254,15 +254,14 @@ body {
 
 /* === AUTH OVERLAY === */
 #auth-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.55);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 1000; backdrop-filter: blur(2px);
+    position: fixed; inset: 0; background: rgba(0,0,0,0.35);
+    display: flex; align-items: flex-start; justify-content: flex-start;
+    z-index: 1000;
 }
 #auth-box {
-    background: rgba(26, 18, 31, 0.7); border: 1px solid rgba(232,146,168,0.25);
-    padding: 40px; border-radius: 12px; width: 380px;
-    text-align: center; backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: rgba(26, 18, 31, 0.75); border: 1px solid rgba(232,146,168,0.25);
+    padding: 30px 36px; border-radius: 12px; width: 340px;
+    text-align: center; margin: 40px 0 0 40px;
 }
 #auth-box h2 { color: var(--cherry); font-size: 28px; margin-bottom: 8px; }
 #auth-box .sub { color: var(--text-dim); font-size: 14px; margin-bottom: 24px; font-style: italic; }
@@ -327,10 +326,10 @@ body {
     text-shadow: 0 0 6px rgba(255,200,220,0.5);
 }
 @keyframes petal-fall {
-    0%   { transform: translateY(-10vh) rotate(0deg) translateX(0); opacity: 0; }
+    0%   { transform: translateY(-10vh) translateX(-30vw) rotate(0deg); opacity: 0; }
     5%   { opacity: 0.85; }
     85%  { opacity: 0.5; }
-    100% { transform: translateY(112vh) rotate(720deg) translateX(var(--drift,50px)); opacity: 0; }
+    100% { transform: translateY(112vh) translateX(30vw) rotate(720deg); opacity: 0; }
 }
 
 /* ═══════════════════════════════════════════
