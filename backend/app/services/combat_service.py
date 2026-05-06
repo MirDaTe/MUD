@@ -32,7 +32,7 @@ def attack_monster(db: Session, char: Character, mon: Monster) -> list:
 
     # 몬스터 반격
     att_templates = mon.attack_templates or [f"{mon.name}의 공격!"]
-    att_text = random.choice(att_templates)
+    att_text = random.choice(att_templates).replace("{name}", mon.name)
     m_crit = random.random() < 0.05
     m_dmg = mon.attack + random.randint(-3, 3)
     if m_crit:

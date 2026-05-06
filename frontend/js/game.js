@@ -194,7 +194,7 @@ async function sendCmd(cmd) {
         if (m.type === 'battle_log') {
             // 전투 로그: 1초 딜레이
             addLog(m);
-            setTimeout(showNext, 1000);
+            setTimeout(showNext, 2000);
         } else {
             // 시스템 메시지 등은 즉시 모두 표시
             addLog(m);
