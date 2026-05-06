@@ -16,6 +16,7 @@ from ..models.shop import Shop
 from ..models.faction import Faction
 from ..models.character_faction import CharacterFaction
 from .combat_service import attack_monster, cast_martial_art, meditate as meditate_service, check_stage_up
+from .enchant_service import upgrade_item
 
 
 def parse_command(cmd: str) -> tuple[str, str]:
@@ -235,6 +236,16 @@ def execute_command(db: Session, char: Character, cmd: str) -> list[dict]:
         db.commit()
         return [{"type": "system", "content": f"{item.name}을(를) 구매했습니다!", "style": "normal"}]
 
+    # ── enchant / upgrade ──
+    if verb in ("enchant", "upgrade", "강화", "인챈트"):
+        p = rest.split()
+        use_protect = "-p" in p or "--protect" in p
+        use_advanced = "-a" in p or "--advanced" in p
+        item_part = " ".join(w for w in p if not w.startswith("-"))
+        if not item_part:
+            return [{"type": "system", "content": "사용법: enchant <아이템명> [-p 보호] [-a 고급강화석]", "style": "warning"}]
+        return upgrade_item(db, char, item_part, use_protect, use_advanced)
+
     # ── help ──
     if verb in ("help", "도움", "?"):
         messages.append({"type": "system", "content": """
@@ -253,6 +264,7 @@ def execute_command(db: Session, char: Character, cmd: str) -> list[dict]:
   quest / 퀘스트       진행 중인 의뢰
   shop / 상점           상점 물품 보기
   buy <아이템>         구매
+  enchant <아이템>      아이템 강화 (+1~+15)
   save / 저장           수동 저장
   help / 도움           도움말""", "style": "normal"})
         return messages

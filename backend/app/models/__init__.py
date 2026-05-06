@@ -15,3 +15,4 @@ from .affection import Affection
 from .faction import Faction
 from .character_faction import CharacterFaction
 from .shop import Shop
+from .enchantment import Enchantment
