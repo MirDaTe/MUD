@@ -56,7 +56,8 @@ def _respawn_monster(monster_id: int, room_ids: list):
             respawn_min=monster_data.get("respawn_min", 30),
             respawn_max=monster_data.get("respawn_max", 120),
             attack_templates=monster_data.get("attack_templates", [f"{monster_data['name']}의 공격!"]),
-            death_template=monster_data.get("death_template", f"{monster_data['name']}이(가) 쓰러졌다!")
+            death_template=monster_data.get("death_template", f"{monster_data['name']}이(가) 쓰러졌다!"),
+            ambient_lines=monster_data.get("ambient_lines", [])
         )
         db.add(new_monster)
         db.flush()

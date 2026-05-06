@@ -61,5 +61,8 @@ class Character(Base):
     guild_buff_speed = Column(Integer, default=0)
     guild_buff_crit = Column(Float, default=0.0)
 
+    # 스토리 출력 여부 (첫 접속 한정)
+    story_shown = False  # 비컬럼 — 세션 내에서만 사용
+
     created_at = Column(DateTime, server_default=func.now())
     owner = relationship("User")

@@ -34,9 +34,9 @@
 
         <!-- Signup -->
         <div id="signup-form" style="display:none">
-            <input id="signup-user" placeholder="이름">
-            <input id="signup-email" placeholder="이메일">
-            <input id="signup-pass" type="password" placeholder="비밀번호">
+            <input id="signup-user" placeholder="이름" onkeydown="if(event.key==='Enter') signup()">
+            <input id="signup-email" placeholder="이메일" onkeydown="if(event.key==='Enter') signup()">
+            <input id="signup-pass" type="password" placeholder="비밀번호" onkeydown="if(event.key==='Enter') signup()">
             <button onclick="signup()">가입하고 강호로</button>
             <div class="switch" onclick="toggleAuth()">이미 무인이신가요? <span>로그인</span></div>
         </div>

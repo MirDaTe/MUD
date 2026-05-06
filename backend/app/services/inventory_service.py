@@ -88,6 +88,15 @@ def _remove_stats(char: Character, stats: dict):
     char.mp = min(char.mp, char.max_mp)
 
 
+def _remove_enchant_bonus(char: Character, item_type: str, bonus_value: int):
+    """캐릭터에서 인챈트 보너스 제거"""
+    if not bonus_value:
+        return
+    stat_key = {"weapon": "attack", "armor": "defense", "accessory": "hp"}.get(item_type, "attack")
+    current = getattr(char, stat_key, 0)
+    setattr(char, stat_key, current - bonus_value)
+
+
 def _apply_stats(char: Character, stats: dict):
     """캐릭터에 장비 스탯 적용"""
     s = stats or {}
@@ -99,8 +108,17 @@ def _apply_stats(char: Character, stats: dict):
     char.crit_rate += s.get("crit_rate", 0.0)
 
 
+def _apply_enchant_bonus(char: Character, item_type: str, bonus_value: int):
+    """캐릭터에 인챈트 보너스 적용"""
+    if not bonus_value:
+        return
+    stat_key = {"weapon": "attack", "armor": "defense", "accessory": "hp"}.get(item_type, "attack")
+    current = getattr(char, stat_key, 0)
+    setattr(char, stat_key, current + bonus_value)
+
+
 def _unequip_inventory(db: Session, char: Character, inv: Inventory):
-    """내부용: 인벤토리 항목 해제 (stats + affix 제거, 슬롯 초기화)"""
+    """내부용: 인벤토리 항목 해제 (stats + affix + enchant 제거, 슬롯 초기화)"""
     item = db.query(Item).filter(Item.id == inv.item_id).first()
     if item:
         _remove_stats(char, item.stats or {})
@@ -110,6 +128,11 @@ def _unequip_inventory(db: Session, char: Character, inv: Inventory):
         stats = affix.get(key, {})
         if stats:
             _remove_stats(char, stats)
+    # 인챈트 보너스 제거
+    from ..models.enchantment import Enchantment
+    ench = db.query(Enchantment).filter(Enchantment.inventory_id == inv.id).first()
+    if ench and ench.bonus_value:
+        _remove_enchant_bonus(char, item.item_type if item else "", ench.bonus_value)
     inv.equipped = 0
     inv.slot = ""
     inv.instance_id = ""
@@ -160,7 +183,14 @@ def equip_item(db: Session, char: Character, item_name: str) -> Optional[str]:
     # 2. 장착 가능한 슬롯인지 확인
     group_info = SLOT_GROUPS.get(item_slot)
     if not group_info:
-        return f"'{item_slot}'은(는) 유효한 장비 슬롯이 아닙니다."
+        slot_ko = {
+            "head": "머리", "chest": "상의", "legs": "하의", "feet": "발",
+            "hands": "손", "cloak": "망토", "necklace": "목걸이", "underwear": "속옷",
+            "mainhand": "주무기", "offhand": "보조무기", "twohand": "양손무기",
+            "ring": "반지", "trinket": "장신구",
+        }
+        item_slot_ko = slot_ko.get(item_slot, item_slot)
+        return f"'{item_slot_ko}'은(는) 유효한 장비 슬롯이 아닙니다."
 
     target_slot: str = ""
 
@@ -226,6 +256,11 @@ def equip_item(db: Session, char: Character, item_name: str) -> Optional[str]:
         stats = affix.get(key, {})
         if stats:
             _apply_stats(char, stats)
+    # 인챈트 보너스 적용
+    from ..models.enchantment import Enchantment
+    ench = db.query(Enchantment).filter(Enchantment.inventory_id == inv.id).first()
+    if ench and ench.bonus_value:
+        _apply_enchant_bonus(char, item.item_type, ench.bonus_value)
     inv.equipped = 1
     inv.slot = target_slot
     inv.instance_id = str(uuid.uuid4())
@@ -295,6 +330,14 @@ def equip_status(db: Session, char: Character) -> dict:
                 name = item.name
                 item_stats = dict(s)
                 instance_id = inv.instance_id or ""
+                # 인챈트 보너스 조회
+                from ..models.enchantment import Enchantment
+                ench = db.query(Enchantment).filter(Enchantment.inventory_id == inv.id).first()
+                enchant_bonus = 0
+                if ench and ench.bonus_value:
+                    enchant_bonus = ench.bonus_value
+                    sk = ench.stat_key or "attack"
+                    item_stats[sk] = item_stats.get(sk, 0) + enchant_bonus
                 # 총합 누적
                 total_stats["attack"] += s.get("attack", 0)
                 total_stats["defense"] += s.get("defense", 0)
@@ -302,6 +345,10 @@ def equip_status(db: Session, char: Character) -> dict:
                 total_stats["mp"] += s.get("mp", 0)
                 total_stats["speed"] += s.get("speed", 0)
                 total_stats["crit_rate"] += s.get("crit_rate", 0.0)
+                # 인챈트 보너스를 총합에 추가
+                if ench and ench.bonus_value:
+                    sk = ench.stat_key or "attack"
+                    total_stats[sk] = total_stats.get(sk, 0) + enchant_bonus
             else:
                 name = "(알 수 없음)"
                 item_stats = {}

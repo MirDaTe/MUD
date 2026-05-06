@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.7.0-cherry?style=for-the-badge">
+  <img src="https://img.shields.io/badge/version-0.8.1-cherry?style=for-the-badge">
   <img src="https://img.shields.io/badge/python-3.9+-blue?style=for-the-badge">
   <img src="https://img.shields.io/badge/license-MIT-lightgrey?style=for-the-badge">
 </p>
@@ -12,7 +12,26 @@
 
 ---
 
-## 🆕 v0.7.0 주요 변경 사항
+## 🆕 v0.8.1 소스 전면 점검 & 안정화
+
+| 기능 | 설명 |
+|------|------|
+| 🔍 **5개 버그 수정** | 리스폰 미작동·인챈트 스탯 공유·JS 문법 오류 2건·talk 중복 쿼리 모두 해결 |
+| 🔄 **리스폰 활성화** | `main.py` startup에서 `register_monster_templates()` 호출 — 사냥 몬스터 정상 재생성 |
+| 📦 **인챈트 분리** | 강화 스탯을 Item 대신 Enchantment 모델에 저장 — 같은 아이템 여러 개도 개별 강화 |
+| 🌐 **슬롯명 한글화** | `eq`·`equip`·`help` 모든 슬롯명 한글 (머리·상의·주무기·반지① 등) |
+| ⌨️ **입력창 초기화** | 명령어 출력 완료 후 입력창 자동 비움 + 포커스 |
+| 🛡️ **네트워크 오류 방어** | sendCmd try/catch → 연결 끊김 시에도 명령어 입력 막히지 않음 |
+| ⌨️ **로그인 Enter 키** | 로그인/회원가입 모든 필드에서 Enter 키 작동 |
+| 🎯 **대상 자동완성** | `공격` 입력 후 스페이스 → 공격 가능 몬스터 목록 자동 표시 및 선택 |
+| 🗺️ **지도 시각화** | `지도` 명령어 → 카드형 모달 UI (★현재 위치, 클릭 이동, ESC 닫기) |
+| 👻 **몬스터 대사 유지** | 리스폰된 몬스터도 ambient_lines(울음소리/대사) 정상 출력 |
+| 📦 **구 loot 호환** | `loot` 필드만 있는 구버전 몬스터도 드롭 정상 작동 |
+| 🔌 **WebSocket 복구** | 채팅 연결 끊김 시 5초 후 자동 재접속 |
+| 🩹 **스토리 플래그** | 첫 스토리 출력 시 exp=1 해킹 대신 `story_shown` 플래그 사용 |
+| 📋 **자동완성 보강** | 누락된 명령어(go/수락/완료/귀환) 자동완성 목록 추가 |
+
+## 🆕 v0.8.0 디아블로2 접두/접미 + 와우식 퀘스트
 
 | 기능 | 설명 |
 |------|------|
@@ -24,6 +43,8 @@
 | 🏪 **상점 개선** | NPC `shop_id` 연동 검색 + 아이템 ⭐레어도/Lv.제한 + 품절 처리 |
 | 🌍 **맵 이동 풍부화** | 이동 방향 한글 표시 + NPC 랜덤 행동 출력 + 몬스터 선공/비선공 구분 |
 | 📖 **배경 스토리** | 신규 캐릭터 최초 진입 시 "낙화검심 — 새로운 전설의 시작" 문구 출력 |
+| 💎 **어픽스 시스템** | 디아블로2 스타일 접두/접미 60종 — 전투 드롭 시 랜덤 부여 |
+| 📜 **퀘스트 시스템** | 20종 퀘스트 — NPC 스토리·수락·완료 처리 + 진행률 바 |
 | 💰 **드롭 개선** | 경험치 = 기존 + HP×0.5 + 공격×2, 골드 = HP/3 + 랜덤(0~공격력) |
 | 🗺️ **지도 UI** | monospace 폰트 + 다크 테마 + ★ 현재 위치 강조 |
 | 🎨 **CSS 확장** | 전투 로그(loot/attack/defense/special) + NPC 대화 + 자동완성 스타일링 |
@@ -98,6 +119,7 @@
 | **아이템** | `sell`/`판매`, `dismantle`/`분해`, `discard`/`버리기`, `shop`/`상점`, `buy`/`구매` |
 | **귀환** 🏠 | `return_set`/`귀환지정`, `return_go`/`귀환` |
 | **강화** | `enchant`/`강화` (+1~+15, `-p`보호 `-a`고급) |
+| **퀘스트** | `quest`/`퀘스트`, `quest_accept`/`수락`, `quest_complete`/`완료` |
 | **문파** | `guild_create`/`길드생성`, `guild_join`/`길드가입`, `guild_approve`/`승인`, `guild_leave`/`탈퇴`, `guild_kick`/`추방`, `guild_rank`/`계급`, `guild_info`/`길드정보`, `guild_storage`/`길드창고`, `guild_deposit`/`보관`, `guild_withdraw`/`인출`, `guild_gold_add`/`입금`, `guild_gold_out`/`출금` |
 | **관리자** 🛡️ | `admin_set`, `admin_tp`, `admin_give`, `admin_give_code`, `admin_users`, `admin_chars`, `admin_rooms`, `admin_items`, `admin_item_info`, `admin_god` |
 
@@ -122,14 +144,15 @@
 git clone https://github.com/MirDaTe/MUD.git && cd MUD/backend
 pip install -r requirements.txt
 
-# 시드 실행
-python3 seed.py && python3 seed_martial_arts.py && python3 seed_items.py
-python3 seed_factions.py && python3 seed_shops.py
-python3 seed_mega_rooms.py && python3 seed_v6_rooms.py
-python3 seed_mega_items.py && python3 seed_v6_weapons.py
-python3 seed_v6_armors.py && python3 seed_v6_consumables.py
+# 시드 실행 (전체)
+python3 seed.py && python3 seed_mega_rooms.py && python3 seed_v4_rooms.py
+python3 seed_v6_rooms.py && python3 seed_items.py && python3 seed_mega_items.py
+python3 seed_v6_weapons.py && python3 seed_v6_armors.py && python3 seed_v6_consumables.py
 python3 seed_mega_monsters.py && python3 seed_v6_monsters.py
-python3 seed_mega_shops.py && python3 seed_mega_npcs.py
+python3 seed_martial_arts.py && python3 seed_factions.py
+python3 seed_affixes.py && python3 seed_quests.py
+python3 seed_shops.py && python3 seed_mega_shops.py
+python3 seed_mega_npcs.py && python3 seed_extended.py
 
 # 서버 실행 (--reload 없이 안정적 운영)
 python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
@@ -145,6 +168,8 @@ python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 | 버전 | 주요 변경 |
 |------|-----------|
+| **v0.8.1** | 🔍 5버그 수정·🔄 리스폰 활성화·📦 인챈트 분리·🌐 슬롯명 한글화·⌨️ 입력창 초기화 |
+| **v0.8.0** | 💎 접두/접미 60종·📜 퀘스트 20종·🔥 선공몬스터·⏱️ 리스폰·⌨️ 자동완성·👤 NPC 개성화 |
 | **v0.7.0** | 🔥 선공몬스터·⏱️ 리스폰·⌨️ 자동완성·👤 NPC 개성화·🏪 상점연동·🌍 맵이동풍부화·📖 배경스토리·💰 드롭개선 |
 | v0.6.4 | 🎨 로그인 배경·✨ 타이틀 애니메이션·🖥️ 서버 통합·⚔️ 자동전투·🗺️ 지도·🎲 스탯 80 자유분배 |
 | v0.6.3 | ⚔️ 자동 전투·🔮 무공 전투·🏃 도망 시스템 |

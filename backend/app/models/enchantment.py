@@ -11,3 +11,5 @@ class Enchantment(Base):
     enchant_level = Column(Integer, default=0)  # 0~15 강화 단계
     upgrade_count = Column(Integer, default=0)  # 시도 횟수
     fail_count = Column(Integer, default=0)
+    stat_key = Column(String(20), default="attack")  # attack/defense/hp
+    bonus_value = Column(Integer, default=0)  # 현재 강화로 인한 추가 스탯 (절대값)

@@ -179,6 +179,18 @@ def _process_drops(db: Session, char: Character, mon: Monster) -> list:
     msgs = []
     drop_table = getattr(mon, "drop_table", []) or []
 
+    # 구버전 loot 필드 폴백: drop_table이 없으면 loot에서 변환
+    if not drop_table:
+        legacy_loot = getattr(mon, "loot", []) or []
+        for loot_item in legacy_loot:
+            if isinstance(loot_item, dict):
+                drop_table.append({
+                    "item_code": loot_item.get("item_code", loot_item.get("code", "")),
+                    "rate": loot_item.get("rate", loot_item.get("chance", 0.1)),
+                    "min_qty": loot_item.get("min_qty", 1),
+                    "max_qty": loot_item.get("max_qty", 1),
+                })
+
     for drop in drop_table:
         item_code = drop.get("item_code", "")
         rate = drop.get("rate", 0.05)

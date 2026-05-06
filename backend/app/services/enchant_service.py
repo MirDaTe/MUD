@@ -45,7 +45,7 @@ def ensure_enchant(db: Session, inventory_id: int) -> Enchantment:
 
 
 def upgrade_item(db: Session, char: Character, item_name: str, use_protect: bool = False, use_advanced: bool = False) -> list[dict]:
-    """아이템 강화"""
+    """아이템 강화 — 스탯은 캐릭터에 직접 적용, Item 모델은 변경하지 않음"""
     messages = []
 
     inv = db.query(Inventory).join(Item).filter(
@@ -99,42 +99,45 @@ def upgrade_item(db: Session, char: Character, item_name: str, use_protect: bool
     success = random.random() * 100 < base_rate
 
     ench.upgrade_count += 1
-    stats = item.stats or {}
-    stat_key = _get_stat_key(item.item_type)
+    item_type = item.item_type
+    stat_key = _get_stat_key(item_type)
 
     if success:
-        # 기존 강화 스탯 제거 후 새로 적용
-        old_bonus = ENCHANT_STAT_BONUS.get(item.item_type, [0]*16)[ench.enchant_level]
-        new_bonus = ENCHANT_STAT_BONUS.get(item.item_type, [0]*16)[next_level]
-        enchant_bonus = new_bonus - old_bonus
+        # 강화 성공: Enchantment.bonus_value를 기준으로 새 보너스 계산
+        old_bonus = ENCHANT_STAT_BONUS.get(item_type, [0]*16)[ench.enchant_level]
+        new_bonus = ENCHANT_STAT_BONUS.get(item_type, [0]*16)[next_level]
+        delta = new_bonus - old_bonus
 
-        if stat_key in stats:
-            stats[stat_key] += enchant_bonus
-        else:
-            stats[stat_key] = item.stats.get(stat_key, 0) + enchant_bonus
-        item.stats = stats
+        # Enchantment에 보너스 저장 (절대값)
+        ench.bonus_value = new_bonus
+        ench.stat_key = stat_key
 
-        # 캐릭터 스탯 갱신
+        # 캐릭터 스탯에 직접 적용 (Item 모델 건드리지 않음)
         if _get_char_attr(char, stat_key) is not None:
             current = _get_char_attr(char, stat_key)
-            _set_char_attr(char, stat_key, current + enchant_bonus)
+            _set_char_attr(char, stat_key, current + delta)
 
         ench.enchant_level = next_level
 
-        msg = f"✦ 강화 성공! +{next_level} {item.name} ✦\n{stat_key} +{enchant_bonus} 상승! (성공률: {base_rate}%)"
+        msg = f"✦ 강화 성공! +{next_level} {item.name} ✦\n{stat_key} +{delta} 상승! (성공률: {base_rate}%)"
         messages.append({"type": "battle_log", "content": msg, "style": "critical"})
     else:
         ench.fail_count += 1
         if not use_protect and ench.enchant_level > 0:
-            ench.enchant_level -= 1
-            rollback = ENCHANT_STAT_BONUS.get(item.item_type, [0]*16)[next_level-1]
-            old = ENCHANT_STAT_BONUS.get(item.item_type, [0]*16)[ench.enchant_level+1]
-            penalty = old - rollback
-            if stat_key in stats:
-                stats[stat_key] -= penalty
-            item.stats = stats
+            # 실패 시 레벨 하락: Enchantment 보너스 재계산
+            old_bonus = ENCHANT_STAT_BONUS.get(item_type, [0]*16)[ench.enchant_level]
+            new_level = ench.enchant_level - 1
+            new_bonus = ENCHANT_STAT_BONUS.get(item_type, [0]*16)[new_level]
+            delta = new_bonus - old_bonus
+
+            ench.bonus_value = new_bonus
+            ench.enchant_level = new_level
+
+            # 캐릭터 스탯 차감 (Item 모델 건드리지 않음)
             if _get_char_attr(char, stat_key) is not None:
-                _set_char_attr(char, stat_key, _get_char_attr(char, stat_key) - penalty)
+                current = _get_char_attr(char, stat_key)
+                _set_char_attr(char, stat_key, current + delta)
+
             msg = f"강화 실패! 아이템이 손상되어 +{ench.enchant_level}로 떨어졌습니다. (성공률: {base_rate}%)"
         else:
             msg = f"강화 실패... 보호석의 힘으로 레벨이 유지됩니다. (성공률: {base_rate}%)"

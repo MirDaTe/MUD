@@ -180,21 +180,43 @@ async function sendCmd(cmd) {
     }
     _sending = true;
     addLog({type:'system', content:`▸ ${cmd}`, style:'system'});
-    const r = await fetch(`${API}/game/cmd?char_id=${currentCharId}`, {
-        method:'POST', headers:{'Authorization':`Bearer ${token}`, 'Content-Type':'application/json'},
-        body: JSON.stringify({command: cmd})
-    });
-    if (!r.ok) { _sending = false; return; }
-    const msgs = await r.json();
+    let msgs;
+    try {
+        const r = await fetch(`${API}/game/cmd?char_id=${currentCharId}`, {
+            method:'POST', headers:{'Authorization':`Bearer ${token}`, 'Content-Type':'application/json'},
+            body: JSON.stringify({command: cmd})
+        });
+        if (!r.ok) { _sending = false; return; }
+        msgs = await r.json();
+    } catch(e) {
+        addLog({type:'system', content:'⚠️ 연결이 끊겼습니다. 잠시 후 다시 시도해주세요.', style:'warning'});
+        _sending = false;
+        return;
+    }
 
     // 전투 틱은 1초 간격으로, 나머지는 즉시 표시
     let i = 0;
     function showNext() {
-        if (i >= msgs.length) { updateStats(); _sending = false; return; }
+        if (i >= msgs.length) {
+            updateStats();
+            _sending = false;
+            // 대상 캐시 초기화 (방 이동/전투 후 대상 변경 가능)
+            if (typeof _targetCache !== 'undefined') { _targetCache.loaded = false; }
+            const cmdInput = document.getElementById('command-input');
+            if (cmdInput) { cmdInput.value = ''; cmdInput.focus(); }
+            return;
+        }
         const m = msgs[i];
         i++;
-        if (m.type === 'battle_log') {
-            // 전투 로그: 1초 딜레이
+        if (m.type === 'map_data') {
+            // 지도 데이터 → 시각적 모달 렌더링
+            try {
+                const mapData = JSON.parse(m.content);
+                renderMapModal(mapData);
+            } catch(e) { addLog({type:'system', content:m.content, style:'normal'}); }
+            showNext();
+        } else if (m.type === 'battle_log') {
+            // 전투 로그: 2초 딜레이
             addLog(m);
             setTimeout(showNext, 2000);
         } else {
@@ -267,6 +289,16 @@ function connectChat() {
             div.textContent = msg.content;
             chatArea.appendChild(div);
         }
+    };
+    chatWs.onerror = () => {
+        console.log('[WS] Connection error, will retry in 5s...');
+        chatWs = null;
+        setTimeout(connectChat, 5000);
+    };
+    chatWs.onclose = (e) => {
+        console.log('[WS] Disconnected (code:', e.code, '), retrying in 5s...');
+        chatWs = null;
+        if (currentCharId) setTimeout(connectChat, 5000);
     };
 }
 
@@ -346,9 +378,12 @@ const COMMANDS = [
     'discard', '버리기', '버리다',
     'gold', '돈', '은전', '소지금',
     'quest', '퀘스트', '의뢰',
-    'return_set', '귀환지정',
-    'return_go', '귀환',
+    'return_set', '귀환지정', 'rset',
+    'return_go', '귀환', 'rgo',
     'arts', '무공목록', '배운무공',
+    'go', '이동', '가다',
+    'quest_accept', '수락',
+    'quest_complete', '완료',
 ];
 
 let cmdHistory = [];
@@ -369,28 +404,113 @@ function setupAutocomplete() {
         input.parentElement.appendChild(dropdown);
     }
     
-    // oninput으로 직접 설정 (중복 등록 방지)
+    // oninput으로 직접 설정 (중복 등록 방지) — 명령어 + 대상 자동완성
     input.oninput = function() {
-        const val = this.value.trim().toLowerCase();
-        if (!val || val.includes(' ')) {
+        const val = this.value.trim();
+        const lowerVal = val.toLowerCase();
+        const parts = val.split(' ');
+        
+        // 명령어 자동완성 (첫 단어, 공백 없음)
+        if (!val || parts.length === 1) {
+            const matches = COMMANDS.filter(c => c.startsWith(lowerVal) && c !== lowerVal);
+            if (matches.length === 0) {
+                dropdown.style.display = 'none';
+                autocompleteVisible = false;
+                return;
+            }
+            dropdown.innerHTML = matches.map(c => `<div class="ac-item" data-cmd="${c}">${c}</div>`).join('');
+            dropdown.style.display = 'block';
+            autocompleteVisible = true;
+            dropdown.querySelectorAll('.ac-item').forEach(el => {
+                el.onclick = function() {
+                    input.value = this.dataset.cmd + ' ';
+                    dropdown.style.display = 'none';
+                    autocompleteVisible = false;
+                    input.focus();
+                    // 대상 명령어면 대상 목록 자동 로드
+                    loadTargetAutocomplete(this.dataset.cmd);
+                };
+            });
+            return;
+        }
+        
+        // 대상 자동완성 (명령어 입력 후 스페이스 + 대상명)
+        const cmd = parts[0].toLowerCase();
+        const targetVerbs = ['attack','공격','공','때리다','talk','대화','말','말걸기','이야기','cast','무공','시전','buy','구매','사다','sell','판매','팔다'];
+        const isTargetVerb = targetVerbs.includes(cmd);
+        
+        if (!isTargetVerb) {
             dropdown.style.display = 'none';
             autocompleteVisible = false;
             return;
         }
-        const matches = COMMANDS.filter(c => c.startsWith(val) && c !== val);
-        if (matches.length === 0) {
+        
+        // 대상명 부분 (첫 공백 이후)
+        const targetPart = parts.slice(1).join(' ').toLowerCase();
+        if (!targetPart) {
+            // 스페이스만 누름 → 모든 대상 표시
+            loadTargetAutocomplete(cmd);
+            return;
+        }
+        
+        // 부분 필터링
+        loadTargetAutocomplete(cmd, targetPart);
+    };
+    
+    // 대상 목록 로드 (백엔드 API 호출)
+    let _targetCache = {npcs: [], monsters: [], loaded: false};
+    async function loadTargetAutocomplete(cmd, filterText = '') {
+        if (!_targetCache.loaded) {
+            try {
+                const r = await fetch(`${API}/game/targets?char_id=${currentCharId}`, {
+                    headers: {'Authorization': `Bearer ${token}`}
+                });
+                if (r.ok) {
+                    _targetCache = await r.json();
+                    _targetCache.loaded = true;
+                }
+            } catch(e) {
+                dropdown.style.display = 'none';
+                autocompleteVisible = false;
+                return;
+            }
+        }
+        
+        let targets = [];
+        // 공격 계열: 몬스터만
+        if (['attack','공격','공','때리다','cast','무공','시전'].includes(cmd)) {
+            targets = _targetCache.monsters;
+        }
+        // 대화 계열: NPC만
+        else if (['talk','대화','말','말걸기','이야기'].includes(cmd)) {
+            targets = _targetCache.npcs;
+        }
+        // 상점 계열: NPC만
+        else if (['buy','구매','사다','sell','판매','팔다'].includes(cmd)) {
+            targets = _targetCache.npcs.filter(n => n.occupation === '상인');
+        }
+
+        if (filterText) {
+            targets = targets.filter(t => t.name.toLowerCase().startsWith(filterText));
+        }
+        
+        if (targets.length === 0) {
             dropdown.style.display = 'none';
             autocompleteVisible = false;
             return;
         }
-        dropdown.innerHTML = matches.map(c => `<div class="ac-item" data-cmd="${c}">${c}</div>`).join('');
+        
+        dropdown.innerHTML = targets.map(t => {
+            const label = t.display || t.name;
+            return `<div class="ac-item" data-target="${t.name}">🎯 ${label}</div>`;
+        }).join('');
         dropdown.style.display = 'block';
         autocompleteVisible = true;
         
-        // 클릭 핸들러
         dropdown.querySelectorAll('.ac-item').forEach(el => {
             el.onclick = function() {
-                input.value = this.dataset.cmd + ' ';
+                const cmd = input.value.split(' ')[0];
+                input.value = cmd + ' ' + this.dataset.target;
                 dropdown.style.display = 'none';
                 autocompleteVisible = false;
                 input.focus();
@@ -404,9 +524,21 @@ function setupAutocomplete() {
             e.preventDefault();
             const first = dropdown.querySelector('.ac-item');
             if (first) {
-                this.value = first.dataset.cmd + ' ';
-                dropdown.style.display = 'none';
-                autocompleteVisible = false;
+                // 명령어 자동완성 (data-cmd 있음)
+                if (first.dataset.cmd) {
+                    this.value = first.dataset.cmd + ' ';
+                    dropdown.style.display = 'none';
+                    autocompleteVisible = false;
+                    // 대상 명령어면 대상 목록 자동 로드
+                    setTimeout(() => loadTargetAutocomplete(first.dataset.cmd), 100);
+                }
+                // 대상 자동완성 (data-target 있음)
+                else if (first.dataset.target) {
+                    const cmd = this.value.split(' ')[0];
+                    this.value = cmd + ' ' + first.dataset.target;
+                    dropdown.style.display = 'none';
+                    autocompleteVisible = false;
+                }
             }
             return;
         }
@@ -444,6 +576,63 @@ function setupAutocomplete() {
             autocompleteVisible = false;
         }, 200);
     };
+}
+
+// ─── MAP MODAL ───
+function renderMapModal(mapData) {
+    // 기존 모달 제거
+    const existing = document.getElementById('map-modal-overlay');
+    if (existing) existing.remove();
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'map-modal-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;display:flex;align-items:center;justify-content:center;';
+    
+    const modal = document.createElement('div');
+    modal.style.cssText = 'background:linear-gradient(135deg,#1a1220,#0f0b12);border:1px solid rgba(232,146,168,0.3);border-radius:12px;padding:24px;max-width:700px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.6);';
+    
+    let html = `<h2 style="color:var(--cherry);margin:0 0 4px 0;font-size:22px;">🗺 ${mapData.region} 지도</h2>`;
+    html += `<div style="color:var(--text-dim);font-size:13px;margin-bottom:16px;">전체 ${mapData.rooms.length}개 방 · ★ = 현재 위치</div>`;
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+    
+    for (const room of mapData.rooms) {
+        const marker = room.is_current ? '★' : '·';
+        const bg = room.is_current ? 'rgba(232,146,168,0.15)' : 'rgba(26,18,32,0.6)';
+        const border = room.is_current ? '1px solid rgba(232,146,168,0.5)' : '1px solid rgba(232,146,168,0.1)';
+        const color = room.is_current ? 'var(--cherry)' : 'var(--text-secondary)';
+        let icons = '';
+        if (room.has_npc) icons += ` 👤${room.npc_count||''}`;
+        if (room.has_monster) icons += ` ⚔${room.monster_count||''}`;
+        
+        html += `<div style="background:${bg};border:${border};border-radius:8px;padding:8px 12px;min-width:140px;flex:1;cursor:pointer;"
+            onclick="document.getElementById('command-input').value='go ${room.name}';sendCmd('go ${room.name}');document.getElementById('map-modal-overlay').remove();"
+            title="클릭하여 이동: ${room.name}">
+            <div style="color:${color};font-weight:700;font-size:14px;">${marker} ${room.name}</div>
+            <div style="color:var(--text-dim);font-size:11px;margin:2px 0;">#${room.id}${icons}</div>
+            <div style="color:var(--text-dim);font-size:10px;">${room.exits || '출구 없음'}</div>
+        </div>`;
+    }
+    html += '</div>';
+    html += '<div style="margin-top:16px;text-align:center;"><button onclick="closeMapModal()" style="background:var(--cherry);border:none;color:#fff;padding:8px 24px;border-radius:6px;cursor:pointer;font-size:14px;">닫기 (ESC)</button></div>';
+    
+    modal.innerHTML = html;
+    overlay.appendChild(modal);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+    
+    // ESC 키 닫기
+    document.addEventListener('keydown', function escHandler(e) {
+        if (e.key === 'Escape') {
+            const el = document.getElementById('map-modal-overlay');
+            if (el) el.remove();
+            document.removeEventListener('keydown', escHandler);
+        }
+    });
+}
+
+function closeMapModal() {
+    const el = document.getElementById('map-modal-overlay');
+    if (el) el.remove();
 }
 
 // ─── KEY HANDLER ───

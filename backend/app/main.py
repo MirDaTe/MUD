@@ -9,7 +9,7 @@ from .core.database import engine, Base
 from .api.endpoints import auth, characters, game, admin
 from .ws.chat import router as ws_router
 
-app = FastAPI(title="낙화검심", version="0.6.4")
+app = FastAPI(title="낙화검심", version="0.8.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,8 +41,10 @@ def index():
 @app.on_event("startup")
 def startup():
     Base.metadata.create_all(bind=engine)
+    from .services.respawn_service import register_monster_templates
+    register_monster_templates()
 
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "name": "낙화검심", "version": "0.6.4"}
+    return {"status": "ok", "name": "낙화검심", "version": "0.8.0"}

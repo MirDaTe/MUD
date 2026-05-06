@@ -106,7 +106,7 @@ def execute_command(db, char, cmd):
     if v == "look":
         if not room: return [{"type":"system","content":"허공...","style":"normal"}]
         # 신규 캐릭터 첫 look 시 배경 스토리 출력
-        if char.level == 1 and char.exp == 0 and char.current_room_id == 1:
+        if char.level == 1 and not getattr(char, "story_shown", False) and char.current_room_id == 1:
             msgs.append({"type": "system", "content": "=" * 40, "style": "room"})
             msgs.append({"type": "system", "content": "⚔ 낙화검심 — 새로운 전설의 시작 ⚔", "style": "critical"})
             msgs.append({"type": "system", "content": "=" * 40, "style": "room"})
@@ -114,8 +114,8 @@ def execute_command(db, char, cmd):
             msgs.append({"type": "room_desc", "content": "너는 이름 없던 자리에서 태어났다. 하지만 네 가슴 속에는 꺼지지 않는 불꽃이 있다. 최강의 영웅이 되어 무림을 재패하고, 잃어버린 평화를 되찾아라.", "style": "room"})
             msgs.append({"type": "room_desc", "content": "길은 멀고 험난하지만, 그 끝에는 반드시 네가 서 있을 것이다.", "style": "room"})
             msgs.append({"type": "system", "content": "-" * 40, "style": "dim"})
-            # 경험치를 1 주어 두 번 출력 안 되게
-            char.exp = 1
+            # 세션 내 플래그로 두 번 출력 방지 (exp 조작 없음)
+            char.story_shown = True
             db.commit()
         msgs.append({"type":"room_desc","content":f"[{room.name}] (#{room.id})","style":"room"})
         msgs.append({"type":"room_desc","content":room.description,"style":"room"})
@@ -148,17 +148,13 @@ def execute_command(db, char, cmd):
             if new_room:
                 msgs.append({"type":"room_desc","content":f"[{new_room.name}] (#{new_room.id})","style":"room"})
                 msgs.append({"type":"room_desc","content":new_room.description,"style":"room"})
-                # NPC 행동 출력
+                # NPC 주변 행동 — ambient_lines에서 랜덤 표시
                 for nid in (new_room.npc_ids or []):
                     npc = db.query(NPC).filter(NPC.id==nid).first()
-                    if npc and npc.dialogue_options:
-                        actions = npc.dialogue_options
-                        action = random.choice(actions) if isinstance(actions, list) else actions
-                        if isinstance(action, dict):
-                            action_text = action.get("action", "")
-                        else:
-                            action_text = str(action)
-                        msgs.append({"type":"npc_present","content":f"  {npc.title or ''} {npc.name}: {action_text}","style":"npc"})
+                    if npc:
+                        amb = getattr(npc, "ambient_lines", [])
+                        if amb:
+                            msgs.append({"type":"npc_ambient","content":f"  {npc.name}: {random.choice(amb)}","style":"npc"})
                 # 출구 표시
                 ex = {k:vv for k,vv in (new_room.exits or {}).items() if vv}
                 if ex:
@@ -200,7 +196,6 @@ def execute_command(db, char, cmd):
                     mon = db.query(Monster).filter(Monster.id==mid).first()
                     if mon and getattr(mon, "is_aggro", False):
                         msgs.append({"type":"system","content":f"🔥 {mon.name}이(가) 당신을 발견하고 덤벼든다!","style":"warning"})
-                        from .combat_service import auto_combat
                         result = auto_combat(db, char, mon, room_ids=[new_room.id])
                         for tick in result.get("ticks", []):
                             msgs.append(tick)
@@ -315,8 +310,13 @@ def execute_command(db, char, cmd):
             if npc and (npc.name.lower() == target or target in npc.name.lower()):
                 found.append(npc)
         if not found:
-            names = ", ".join([db.query(NPC).filter(NPC.id==nid).first().name for nid in (room.npc_ids or []) if db.query(NPC).filter(NPC.id==nid).first()])
-            return [{"type":"system","content":f"대화 상대 없음. 주변 NPC: {names or '없음'}","style":"warning"}]
+            npc_names = []
+            for nid in (room.npc_ids or []):
+                npc = db.query(NPC).filter(NPC.id==nid).first()
+                if npc:
+                    npc_names.append(npc.name)
+            names = ", ".join(npc_names) if npc_names else "없음"
+            return [{"type":"system","content":f"대화 상대 없음. 주변 NPC: {names}","style":"warning"}]
         npc = found[0]
         lines = [f"── {npc.name} ──"]
         if npc.title:
@@ -383,15 +383,22 @@ def execute_command(db, char, cmd):
 
     if v == "eq":
         es = equip_status(db, char)
+        slot_ko = {
+            "head": "머리", "chest": "상의", "legs": "하의", "feet": "발",
+            "hands": "손", "cloak": "망토", "necklace": "목걸이", "underwear": "속옷",
+            "mainhand": "주무기", "offhand": "보조무기",
+            "ring1": "반지①", "ring2": "반지②",
+            "trinket1": "장신구①", "trinket2": "장신구②",
+        }
         lines = ["[장비현황]"]
         for sn, info in es["slots"].items():
+            sn_display = slot_ko.get(sn, sn)
             if info:
-                sn_display = sn.replace("1","①").replace("2","②")
                 s = info["stats"]
                 stat_str = f" 공:{s.get('attack',0)} 방:{s.get('defense',0)} HP:{s.get('hp',0)} MP:{s.get('mp',0)} 속:{s.get('speed',0)}"
                 lines.append(f"  {sn_display}: {info['name']}{stat_str}")
             else:
-                lines.append(f"  {sn}: 빈칸")
+                lines.append(f"  {sn_display}: 빈칸")
         lines.append(f"  ────────────────────────")
         lines.append(f"  총합 공:{es['total_attack']} 방:{es['total_defense']} HP:{es['max_hp']} MP:{es['max_mp']} 속:{es['speed']} 치명:{es['crit_rate']:.0%}")
         return [{"type":"system","content":"\n".join(lines),"style":"normal"}]
@@ -677,17 +684,26 @@ def execute_command(db, char, cmd):
         region_rooms = db.query(Room).filter(Room.region == region_name).order_by(Room.id).all()
         if len(region_rooms) <= 1:
             return [{"type":"system","content":f"[{region_name}] 지도 정보가 없습니다.","style":"normal"}]
-        # 방 ID → 표시할 문자 매핑
-        id_to_char = {}
-        for r in region_rooms:
-            id_to_char[r.id] = "★" if r.id == char.current_room_id else "·"
-        # exits 기반으로 연결선 구성 (간단한 리스트 형태)
-        lines = [f"[{region_name} 지도] (총 {len(region_rooms)}개 방, ★ = 현재 위치)"]
+        # 구조화된 지도 데이터 구성
+        map_data = {
+            "region": region_name,
+            "current_room": char.current_room_id,
+            "rooms": []
+        }
         for r in region_rooms:
             exits_str = ", ".join(f"{d}→#{t}" for d, t in (r.exits or {}).items() if t)
-            marker = id_to_char.get(r.id, "·")
-            lines.append(f"  {marker} #{r.id} {r.name}  [{exits_str}]")
-        return [{"type":"system","content":"\n".join(lines),"style":"normal"}]
+            map_data["rooms"].append({
+                "id": r.id,
+                "name": r.name,
+                "is_current": r.id == char.current_room_id,
+                "exits": exits_str,
+                "has_npc": len(r.npc_ids or []) > 0,
+                "has_monster": len(r.monster_ids or []) > 0,
+                "npc_count": len(r.npc_ids or []),
+                "monster_count": len(r.monster_ids or []),
+            })
+        import json
+        return [{"type":"map_data","content":json.dumps(map_data, ensure_ascii=False),"style":"normal"}]
 
     if v == "admin_god": char.hp=char.max_hp=999999; char.attack=char.defense=9999; db.commit(); return [{"type":"system","content":"⚡무적!","style":"critical"}]
 
@@ -742,7 +758,7 @@ def _build_help(is_admin_user: bool) -> str:
     equipment = """
 [장비]
 • equip 아이템 / 장착 아이템 — 아이템을 해당 슬롯에 장착합니다.
-  예) equip 철검 → 철검을 mainhand 슬롯에 장착합니다.
+  예) equip 철검 → 철검을 주무기 슬롯에 장착합니다.
 
 • unequip 아이템 / 해제 아이템 — 장착 중인 아이템을 해제합니다.
   예) unequip 철검 → 철검 장착을 해제합니다.
