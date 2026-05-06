@@ -6,6 +6,7 @@ let token = '';
 let username = '';
 let currentCharId = null;
 let chatWs = null;
+let petalTimer = null;
 const STAT_IDS = ['physique','ki','agility','insight','charm','luck'];
 const MAX_PTS = 80;
 const DEFAULT_VAL = 10;
@@ -57,6 +58,8 @@ function logout() {
     document.getElementById('auth-overlay').style.display = 'flex';
     document.getElementById('login-user').value = '';
     document.getElementById('login-pass').value = '';
+    document.body.classList.remove('game-active');
+    transitionToAuthPetals();
 }
 
 // ─── CHARACTERS ───
@@ -137,6 +140,8 @@ async function selectChar(id) {
         document.getElementById('top-region').textContent = '';  // look에서 업데이트
     }
     document.getElementById('btn-logout').style.display = 'inline-block';
+    document.body.classList.add('game-active');
+    transitionToGamePetals();
     await sendCmd('look');
     connectChat();
 }
@@ -241,8 +246,42 @@ function switchTab(tab) {
     document.getElementById(`panel-${tab}`).classList.add('active');
 }
 
+// ─── PETALS (벚꽃 입자 애니메이션) ───
+function spawnPetals(cls = '') {
+    const PETALS = 25;
+    const chars = ['🌸','💮','🌺','🏵','✿','❀'];
+    const container = document.body;
+    for (let i = 0; i < PETALS; i++) {
+        const el = document.createElement('span');
+        el.className = 'petal' + (cls ? ' ' + cls : '');
+        el.textContent = chars[i % chars.length];
+        el.style.left = Math.random() * 100 + '%';
+        el.style.setProperty('--drift', (Math.random() - 0.5) * 300 + 'px');
+        el.style.animationDelay = Math.random() * 8 + 's';
+        el.style.animationDuration = (8 + Math.random() * 12) + 's';
+        container.appendChild(el);
+    }
+}
+
+function clearPetals() {
+    document.querySelectorAll('.petal').forEach(el => el.remove());
+}
+
+function transitionToGamePetals() {
+    // auth 페탈 → 인게임 페탈로 전환
+    clearPetals();
+    spawnPetals('ingame');
+}
+
+function transitionToAuthPetals() {
+    // 인게임 페탈 → auth 페탈로 전환
+    clearPetals();
+    spawnPetals('');
+}
+
 // ─── KEY HANDLER ───
 document.addEventListener('DOMContentLoaded', () => {
+    spawnPetals('');
     document.getElementById('command-input').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') sendCmd();
     });
