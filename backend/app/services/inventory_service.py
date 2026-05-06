@@ -100,10 +100,16 @@ def _apply_stats(char: Character, stats: dict):
 
 
 def _unequip_inventory(db: Session, char: Character, inv: Inventory):
-    """내부용: 인벤토리 항목 해제 (stats 제거, 슬롯 초기화)"""
+    """내부용: 인벤토리 항목 해제 (stats + affix 제거, 슬롯 초기화)"""
     item = db.query(Item).filter(Item.id == inv.item_id).first()
     if item:
         _remove_stats(char, item.stats or {})
+    # 어픽스 스탯도 제거
+    affix = getattr(inv, "affix_data", {}) or {}
+    for key in ("prefix_stats", "suffix_stats"):
+        stats = affix.get(key, {})
+        if stats:
+            _remove_stats(char, stats)
     inv.equipped = 0
     inv.slot = ""
     inv.instance_id = ""
@@ -214,6 +220,12 @@ def equip_item(db: Session, char: Character, item_name: str) -> Optional[str]:
 
     # 3. 장착 실행
     _apply_stats(char, item.stats or {})
+    # 어픽스 스탯도 적용
+    affix = getattr(inv, "affix_data", {}) or {}
+    for key in ("prefix_stats", "suffix_stats"):
+        stats = affix.get(key, {})
+        if stats:
+            _apply_stats(char, stats)
     inv.equipped = 1
     inv.slot = target_slot
     inv.instance_id = str(uuid.uuid4())

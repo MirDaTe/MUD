@@ -34,3 +34,6 @@ class Monster(Base):
     is_aggro = Column(Boolean, default=False)      # 선공 몬스터 여부
     respawn_min = Column(Integer, default=30)       # 최소 리스폰 시간(초)
     respawn_max = Column(Integer, default=120)      # 최대 리스폰 시간(초)
+
+    # ambient 대사 (방에 있을 때 랜덤 출력)
+    ambient_lines = Column(JSON, default=list)  # ["크르릉...", "우어어!"]

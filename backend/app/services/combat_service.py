@@ -1,5 +1,6 @@
 """전투 서비스 — 틱 기반 자동 전투, 드롭, 도망 시스템"""
 import random
+import uuid
 from typing import Optional
 from sqlalchemy.orm import Session
 from ..models.character import Character
@@ -172,7 +173,9 @@ def _use_martial_tick(db: Session, char: Character, mon: Monster, art_name: str)
 
 
 def _process_drops(db: Session, char: Character, mon: Monster) -> list:
-    """몬스터 드롭테이블 처리. 드롭 메시지 리스트 반환."""
+    """몬스터 드롭테이블 처리 + 접두/접미 랜덤 부여. 드롭 메시지 리스트 반환."""
+    from .affix_service import roll_affixes_for_item, get_affix_display_name
+
     msgs = []
     drop_table = getattr(mon, "drop_table", []) or []
 
@@ -205,27 +208,36 @@ def _process_drops(db: Session, char: Character, mon: Monster) -> list:
             })
             continue
 
-        # 기존 스택 찾기 (소모품 등)
-        existing = db.query(Inventory).filter(
-            Inventory.character_id == char.id,
-            Inventory.item_id == item.id,
-            Inventory.equipped == 0
-        ).first()
+        # 장비 아이템에만 어픽스 부여 (weapon, armor, accessory)
+        affix_data = {}
+        if item.item_type in ("weapon", "armor", "accessory"):
+            affix_data = roll_affixes_for_item(db, item.id)
+
+        # 기존 스택 찾기 (소모품 등, 어픽스 없는 아이템만)
+        existing = None
+        if not affix_data:
+            existing = db.query(Inventory).filter(
+                Inventory.character_id == char.id,
+                Inventory.item_id == item.id,
+                Inventory.equipped == 0
+            ).first()
 
         if existing and item.stack_limit > 1:
             existing.quantity = min(existing.quantity + qty, item.stack_limit)
         else:
-            import uuid
             db.add(Inventory(
                 character_id=char.id,
                 item_id=item.id,
                 quantity=qty,
-                instance_id=str(uuid.uuid4()) if item.stack_limit == 1 else ""
+                instance_id=str(uuid.uuid4()) if item.stack_limit == 1 else "",
+                affix_data=affix_data
             ))
 
+        display_name = get_affix_display_name(item.name, affix_data) if affix_data else item.name
+        rarity_str = " " + "⭐" * item.rarity if item.rarity > 1 else ""
         msgs.append({
             "type": "system",
-            "content": f"📦 {item.name} x{qty} 획득!{' ' + '⭐' * item.rarity if item.rarity > 1 else ''}",
+            "content": f"📦 {display_name} x{qty} 획득!{rarity_str}",
             "style": "loot"
         })
 

@@ -14,3 +14,7 @@ class Quest(Base):
     next_quest_id = Column(Integer, nullable=True)
     faction_id = Column(Integer, nullable=True)
     min_level = Column(Integer, default=1)
+    giver_npc_id = Column(Integer, nullable=True)  # 퀘스트 주는 NPC ID
+    story_text = Column(String(2000), default="")  # NPC가 퀘스트 줄 때 하는 스토리 대사
+    accept_text = Column(String(500), default="")  # 수락 시 출력
+    complete_text = Column(String(500), default="")  # 완료 시 NPC 대사

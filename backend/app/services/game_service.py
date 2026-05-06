@@ -24,6 +24,7 @@ from .admin_service import is_admin, admin_set_stat, admin_teleport, admin_give_
 from .guild_service import create_guild, join_guild, approve_application, leave_guild, kick_member, change_rank, get_guild_info, add_reputation, add_guild_gold, withdraw_guild_gold, deposit_to_storage, withdraw_from_storage, get_storage_contents
 from .inventory_service import sell_item, dismantle_item, discard_item, equip_status, unequip, equip_item, unequip_item
 from .return_service import set_return_point, use_return_scroll, use_town_scroll
+from .affix_service import get_affix_display_name
 
 
 def parse_command(cmd):
@@ -60,7 +61,9 @@ def normalize_verb(v, r):
         "shop":"shop","상점":"shop","물품":"shop","상인":"shop",
         "buy":"buy","구매":"buy","사다":"buy",
         "enchant":"enchant","upgrade":"enchant","강화":"enchant","인챈트":"enchant","강화하기":"enchant",
-        "quest":"quest","퀘스트":"quest","의뢰":"quest","임무":"quest",
+        "quest": "quest", "퀘스트": "quest", "의뢰": "quest", "임무": "quest",
+        "quest_accept": "quest_accept", "수락": "quest_accept",
+        "quest_complete": "quest_complete", "완료": "quest_complete",
         "gold":"gold","money":"gold","돈":"gold","은전":"gold","소지금":"gold",
         "eq":"eq","equipment":"eq","장비":"eq","장비창":"eq",
         "save":"save","저장":"save","기록":"save",
@@ -167,11 +170,31 @@ def execute_command(db, char, cmd):
                     if npc:
                         title_str = f" [{npc.title}]" if npc.title else ""
                         msgs.append({"type":"npc_present","content":f"  {npc.name}{title_str}(이)가 있습니다.","style":"npc"})
+                        # ambient_lines (혼잣말)
+                        amb = getattr(npc, "ambient_lines", [])
+                        if amb:
+                            msgs.append({"type":"npc_ambient","content":f"    「{random.choice(amb)}」","style":"dim"})
+                        # 퀘스트 주는 NPC: 자동으로 퀘스트 제안
+                        if getattr(npc, "quest_giver", False):
+                            quests = db.query(Quest).filter(Quest.giver_npc_id == nid, Quest.min_level <= char.level).all()
+                            for q in quests:
+                                already = db.query(CharacterQuest).filter(
+                                    CharacterQuest.character_id == char.id,
+                                    CharacterQuest.quest_id == q.id
+                                ).first()
+                                if not already and q.story_text:
+                                    msgs.append({"type":"npc_dialogue","content":q.story_text,"style":"npc"})
+                                    msgs.append({"type":"system","content":"'quest_accept {0}' 또는 '수락 {0}'으로 퀘스트를 받을 수 있습니다.".format(q.id),"style":"dim"})
+                                    break
                 for mid in (new_room.monster_ids or []):
                     mon = db.query(Monster).filter(Monster.id==mid).first()
                     if mon:
                         aggro_str = " ⚠️선공!" if getattr(mon, "is_aggro", False) else ""
                         msgs.append({"type":"monster_present","content":f"⚠️ {mon.name}! (HP:{mon.hp}/{mon.max_hp}){aggro_str}","style":"warning"})
+                        # 몬스터 ambient_lines (울음소리, 혼잣말)
+                        mamb = getattr(mon, "ambient_lines", [])
+                        if mamb:
+                            msgs.append({"type":"monster_ambient","content":f"  「{random.choice(mamb)}」","style":"dim"})
                 # ⚠️ 선공 몬스터 체크 — 자동 전투
                 for mid in list(new_room.monster_ids or []):
                     mon = db.query(Monster).filter(Monster.id==mid).first()
@@ -336,7 +359,7 @@ def execute_command(db, char, cmd):
         for i in invs:
             it=db.query(ItemModel).filter(ItemModel.id==i.item_id).first()
             eq=" [장착중]" if i.equipped else ""
-            lines.append(f"  {it.name} x{i.quantity}{eq}")
+            lines.append(f"  {get_affix_display_name(it.name, getattr(i, 'affix_data', {}))} x{i.quantity}{eq}")
         return [{"type":"system","content":"\n".join(lines),"style":"normal"}]
 
     if v == "arts":
@@ -450,12 +473,71 @@ def execute_command(db, char, cmd):
 
     if v == "quest":
         cqs=db.query(CharacterQuest).filter(CharacterQuest.character_id==char.id,CharacterQuest.status=="active").all()
-        if not cqs: return [{"type":"system","content":"의뢰 없음.","style":"normal"}]
-        lines=["[의뢰]"]
+        if not cqs: return [{"type":"system","content":"진행 중인 의뢰가 없습니다. NPC에게 접근하면 퀘스트를 받을 수 있습니다.","style":"normal"}]
+        lines=["══ 의뢰 진행 상황 ══"]
         for cq in cqs:
             q=db.query(Quest).filter(Quest.id==cq.quest_id).first()
-            if q: lines.append(f"  {q.name} ({cq.progress}/{q.objectives.get('count',1)})")
+            if q:
+                pct = int(cq.progress / q.objectives.get("count",1) * 100)
+                bar = "█" * (pct // 10) + "░" * (10 - pct // 10)
+                lines.append(f"  📋 {q.name} [{bar}] {pct}% ({cq.progress}/{q.objectives.get('count',1)})")
         return [{"type":"system","content":"\n".join(lines),"style":"normal"}]
+
+    if v == "quest_accept":
+        try: qid = int(rest.strip())
+        except: return [{"type":"system","content":"사용법: quest_accept 퀘스트ID 또는 '수락 1'","style":"warning"}]
+        q = db.query(Quest).filter(Quest.id == qid).first()
+        if not q: return [{"type":"system","content":"없는 퀘스트입니다.","style":"warning"}]
+        already = db.query(CharacterQuest).filter(
+            CharacterQuest.character_id == char.id,
+            CharacterQuest.quest_id == qid
+        ).first()
+        if already: return [{"type":"system","content":"이미 수락한 퀘스트입니다.","style":"warning"}]
+        if char.level < q.min_level: return [{"type":"system","content":f"레벨이 부족합니다. (필요 Lv.{q.min_level})","style":"warning"}]
+        db.add(CharacterQuest(character_id=char.id, quest_id=qid, status="active", progress=0))
+        db.commit()
+        msgs = [{"type":"system","content":f"✅ 퀘스트 수락: [{q.name}]","style":"critical"}]
+        if q.accept_text:
+            msgs.append({"type":"npc_dialogue","content":q.accept_text,"style":"npc"})
+        msgs.append({"type":"system","content":f"📋 목표: {q.description}","style":"normal"})
+        if q.rewards:
+            r = q.rewards
+            reward_parts = []
+            if r.get("exp"): reward_parts.append(f"⭐경험치 {r['exp']}")
+            if r.get("gold"): reward_parts.append(f"💰{r['gold']}은전")
+            if reward_parts:
+                msgs.append({"type":"system","content":"🎁 보상: " + ", ".join(reward_parts),"style":"normal"})
+        return msgs
+
+    if v == "quest_complete":
+        try: qid = int(rest.strip())
+        except: return [{"type":"system","content":"사용법: quest_complete 퀘스트ID 또는 '완료 1'","style":"warning"}]
+        cq = db.query(CharacterQuest).filter(
+            CharacterQuest.character_id == char.id,
+            CharacterQuest.quest_id == qid,
+            CharacterQuest.status == "active"
+        ).first()
+        if not cq: return [{"type":"system","content":"수행 중이지 않은 퀘스트입니다.","style":"warning"}]
+        q = db.query(Quest).filter(Quest.id == qid).first()
+        needed = q.objectives.get("count", 1) if q else 1
+        if cq.progress < needed:
+            return [{"type":"system","content":f"아직 목표를 달성하지 못했습니다. ({cq.progress}/{needed})","style":"warning"}]
+        cq.status = "completed"
+        msgs = [{"type":"system","content":f"🎉 퀘스트 완료: [{q.name}]","style":"critical"}]
+        if q.rewards:
+            r = q.rewards
+            if r.get("exp"):
+                char.exp += r["exp"]
+                msgs.append({"type":"system","content":f"⭐ 경험치 +{r['exp']}","style":"normal"})
+            if r.get("gold"):
+                char.gold += r["gold"]
+                msgs.append({"type":"system","content":f"💰 은전 +{r['gold']}","style":"normal"})
+        if q.complete_text:
+            msgs.append({"type":"npc_dialogue","content":q.complete_text,"style":"npc"})
+        _check_lv(db, char, msgs)
+        db.commit()
+        return msgs
+
 
     # ── GUILD ──
     if v == "guild_create":

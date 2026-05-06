@@ -9,6 +9,7 @@ from .martial_art import MartialArt
 from .character_martial_art import CharacterMartialArt
 from .item import Item
 from .inventory import Inventory
+from .item_affix import ItemAffix
 from .quest import Quest
 from .character_quest import CharacterQuest
 from .affection import Affection
