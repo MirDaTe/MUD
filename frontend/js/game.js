@@ -6,6 +6,9 @@ let token = '';
 let username = '';
 let currentCharId = null;
 let chatWs = null;
+const STAT_IDS = ['physique','ki','agility','insight','charm','luck'];
+const MAX_PTS = 80;
+const DEFAULT_VAL = 10;
 
 // ─── AUTH ───
 function toggleAuth() {
@@ -27,7 +30,6 @@ async function login() {
     const d = await r.json();
     token = d.access_token; username = d.username;
     document.getElementById('auth-overlay').style.display = 'none';
-    document.getElementById('game-ui').style.display = 'flex';
     loadChars();
 }
 
@@ -44,8 +46,17 @@ async function signup() {
     const d = await r.json();
     token = d.access_token; username = d.username;
     document.getElementById('auth-overlay').style.display = 'none';
-    document.getElementById('game-ui').style.display = 'flex';
     loadChars();
+}
+
+function logout() {
+    token = ''; username = ''; currentCharId = null;
+    if (chatWs) { chatWs.close(); chatWs = null; }
+    document.getElementById('game-ui').style.display = 'none';
+    document.getElementById('char-select').style.display = 'none';
+    document.getElementById('auth-overlay').style.display = 'flex';
+    document.getElementById('login-user').value = '';
+    document.getElementById('login-pass').value = '';
 }
 
 // ─── CHARACTERS ───
@@ -85,14 +96,44 @@ async function createChar() {
     selectChar(c.id);
 }
 
+function updatePts(changedId) {
+    const total = STAT_IDS.reduce((sum, id) => sum + (+document.getElementById(id).value), 0);
+    const remain = MAX_PTS - total;
+    document.getElementById('remain-pts').textContent = remain;
+    if (remain < 0) {
+        document.getElementById('remain-pts').style.color = '#ff6b6b';
+        document.getElementById(changedId).value = +document.getElementById(changedId).value + remain;
+        document.getElementById(changedId[0]+'v').textContent = document.getElementById(changedId).value;
+        document.getElementById('remain-pts').textContent = '0';
+    } else {
+        document.getElementById('remain-pts').style.color = '#e892a8';
+    }
+    document.getElementById(changedId[0]+'v').textContent = document.getElementById(changedId).value;
+}
+
 function showNewChar() {
     document.getElementById('new-char-form').style.display = 'block';
+    // reset all to defaults
+    STAT_IDS.forEach(id => {
+        document.getElementById(id).value = DEFAULT_VAL;
+        document.getElementById(id[0]+'v').textContent = DEFAULT_VAL;
+    });
+    document.getElementById('remain-pts').textContent = MAX_PTS - DEFAULT_VAL * 6;
 }
 
 async function selectChar(id) {
     currentCharId = id;
     document.getElementById('char-select').style.display = 'none';
     document.getElementById('game-ui').style.display = 'flex';
+    // topbar에 캐릭터명 표시
+    const r = await fetch(`${API}/characters/`, {headers:{'Authorization':`Bearer ${token}`}});
+    const chars = await r.json();
+    const c = chars.find(x => x.id === id);
+    if (c) {
+        document.getElementById('top-char').textContent = c.name;
+        document.getElementById('top-region').textContent = '';  // look에서 업데이트
+    }
+    document.getElementById('btn-logout').style.display = 'inline-block';
     await sendCmd('look');
     connectChat();
 }

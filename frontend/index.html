@@ -54,13 +54,16 @@
                 <option>관가 추방검객</option>
                 <option>의문의 기억상실자</option>
             </select>
+            <div class="points-info" style="color:var(--text-dim); font-size:13px; margin:8px 0;">
+                남은 포인트: <span id="remain-pts" style="color:#e892a8;font-weight:700;">80</span>
+            </div>
             <div class="attr-grid" style="margin-bottom:10px">
-                <span>근골</span><input id="physique" type="range" min="1" max="20" value="10" oninput="document.getElementById('pv').textContent=this.value"><span id="pv">10</span>
-                <span>기맥</span><input id="ki" type="range" min="1" max="20" value="10" oninput="document.getElementById('kv').textContent=this.value"><span id="kv">10</span>
-                <span>신법</span><input id="agility" type="range" min="1" max="20" value="10" oninput="document.getElementById('av').textContent=this.value"><span id="av">10</span>
-                <span>심안</span><input id="insight" type="range" min="1" max="20" value="10" oninput="document.getElementById('iv').textContent=this.value"><span id="iv">10</span>
-                <span>매력</span><input id="charm" type="range" min="1" max="20" value="10" oninput="document.getElementById('cv').textContent=this.value"><span id="cv">10</span>
-                <span>복운</span><input id="luck" type="range" min="1" max="20" value="10" oninput="document.getElementById('lv').textContent=this.value"><span id="lv">10</span>
+                <span>근골</span><input id="physique" type="range" min="3" max="30" value="10" oninput="updatePts('physique')"><span id="pv">10</span>
+                <span>기맥</span><input id="ki" type="range" min="3" max="30" value="10" oninput="updatePts('ki')"><span id="kv">10</span>
+                <span>신법</span><input id="agility" type="range" min="3" max="30" value="10" oninput="updatePts('agility')"><span id="av">10</span>
+                <span>심안</span><input id="insight" type="range" min="3" max="30" value="10" oninput="updatePts('insight')"><span id="iv">10</span>
+                <span>매력</span><input id="charm" type="range" min="3" max="30" value="10" oninput="updatePts('charm')"><span id="cv">10</span>
+                <span>복운</span><input id="luck" type="range" min="3" max="30" value="10" oninput="updatePts('luck')"><span id="lv">10</span>
             </div>
             <button onclick="createChar()">캐릭터 생성</button>
         </div>

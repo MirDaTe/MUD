@@ -88,6 +88,7 @@ def normalize_verb(v, r):
         "admin_give_code":"admin_give_code","gcode":"admin_give_code","아이템코드지급":"admin_give_code",
         "return_set":"return_set","rset":"return_set","귀환지정":"return_set",
         "return_go":"return_go","rgo":"return_go","귀환":"return_go",
+        "map":"map","지도":"map","m":"map",
         "admin_god":"admin_god","god":"admin_god","무적":"admin_god",
     }
     return (m.get(v.lower(), v), r)
@@ -469,6 +470,23 @@ def execute_command(db, char, cmd):
         if e: return [{"type":"system","content":e,"style":"warning"}]
         return execute_command(db,char,"look")
 
+    if v == "map":
+        region_name = room.region if room else ""
+        region_rooms = db.query(Room).filter(Room.region == region_name).order_by(Room.id).all()
+        if len(region_rooms) <= 1:
+            return [{"type":"system","content":f"[{region_name}] 지도 정보가 없습니다.","style":"normal"}]
+        # 방 ID → 표시할 문자 매핑
+        id_to_char = {}
+        for r in region_rooms:
+            id_to_char[r.id] = "★" if r.id == char.current_room_id else "·"
+        # exits 기반으로 연결선 구성 (간단한 리스트 형태)
+        lines = [f"[{region_name} 지도] (총 {len(region_rooms)}개 방, ★ = 현재 위치)"]
+        for r in region_rooms:
+            exits_str = ", ".join(f"{d}→#{t}" for d, t in (r.exits or {}).items() if t)
+            marker = id_to_char.get(r.id, "·")
+            lines.append(f"  {marker} #{r.id} {r.name}  [{exits_str}]")
+        return [{"type":"system","content":"\n".join(lines),"style":"normal"}]
+
     if v == "admin_god": char.hp=char.max_hp=999999; char.attack=char.defense=9999; db.commit(); return [{"type":"system","content":"⚡무적!","style":"critical"}]
 
     if v == "help":
@@ -487,6 +505,9 @@ def _build_help(is_admin_user: bool) -> str:
 • look / 보기 / 주변 — 현재 방의 정보를 확인합니다.
   예) look → 「마을 광장」 주변을 둘러봅니다.
 
+• map / 지도 — 현재 지역의 지도를 표시합니다.
+  예) 지도 → ★ = 현재 위치, 빈칸 = 갈 수 있는 방
+
 • 북 / 남 / 동 / 서 / 위 / 아래 / n / s / e / w / u / d — 해당 방향으로 이동합니다.
   예) 북 → 북쪽으로 이동합니다.
 
@@ -501,7 +522,13 @@ def _build_help(is_admin_user: bool) -> str:
 
     battle = """
 [전투]
-• attack 대상 / 공격 대상 — 대상을 공격합니다 (자동 전투).\n  예) attack 도적 → 도적과 자동 전투를 시작합니다.\n\n• flee / 도망 / 도망치다 — 전투에서 도망칩니다.\n  예) flee → 30~85% 확률로 도망 (속도에 따라)\n\n• cast 무공명 / 시전 무공명 — 무공을 시전하고 자동 전투합니다.
+• attack 대상 / 공격 대상 — 대상을 자동 전투합니다.
+  예) attack 도적 → 도적과 전투 시작!
+
+• flee / 도망 / 도망치다 — 속도 기반 도망 (30~85%).
+  예) 도망 → 도망 성공 시 귀환장소로 이동
+
+• cast 무공명 / 시전 무공명 — 무공 시전 + 자동 전투.
   예) cast 벽력검법 → 벽력검법으로 적을 공격합니다.
 
 • meditate / 명상 / 수련 / 운기 — 명상으로 HP와 MP를 회복합니다.
