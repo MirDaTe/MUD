@@ -126,9 +126,10 @@ def execute_command(db, char, cmd):
         return [{"type":"system","content":"갈 수 없습니다.","style":"warning"}]
 
     if v == "attack":
+        target = rest.lower().strip()
         for mid in list(room.monster_ids or []):
             mon=db.query(Monster).filter(Monster.id==mid).first()
-            if mon and mon.name.lower()==rest.lower():
+            if mon and (mon.name.lower() == target or target in mon.name.lower()):
                 result = auto_combat(db, char, mon)
                 msgs = []
                 # 틱 로그 (최대 15개만 표시)
@@ -220,10 +221,10 @@ def execute_command(db, char, cmd):
     if v == "status":
         fac=db.query(CharacterFaction).filter(CharacterFaction.character_id==char.id).first()
         fn=db.query(Faction).filter(Faction.id==fac.faction_id).first().name if fac else "무소속"
-        tn=_exp_for_level(char.level)
+        tn=_exp_for_level(char.level + 1)  # 다음 레벨까지 필요한 총 경험치
         buf=f" 버프:공{char.guild_buff_attack} 방{char.guild_buff_defense} HP{char.guild_buff_hp}" if char.guild_buff_attack else ""
         s=f"""══ {char.name} [{char.origin}] ══
- Lv.{char.level} ({char.exp}/{tn})  경지:{char.martial_stage}  은전:{char.gold}
+ Lv.{char.level} (현재:{char.exp}/다음:{tn})  경지:{char.martial_stage}  은전:{char.gold}
  HP:{char.hp}/{char.max_hp} MP:{char.mp}/{char.max_mp}
  공격:{char.attack} 방어:{char.defense} 속도:{char.speed} 치명:{char.crit_rate:.1%}
  근골{char.physique} 기맥{char.ki} 신법{char.agility} 심안{char.insight} 매력{char.charm} 복운{char.luck}

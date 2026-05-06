@@ -174,8 +174,24 @@ async function sendCmd(cmd) {
     });
     if (!r.ok) return;
     const msgs = await r.json();
-    for (const m of msgs) addLog(m);
-    updateStats();
+
+    // 전투 틱은 1초 간격으로, 나머지는 즉시 표시
+    let i = 0;
+    function showNext() {
+        if (i >= msgs.length) { updateStats(); return; }
+        const m = msgs[i];
+        i++;
+        if (m.type === 'battle_log') {
+            // 전투 로그: 1초 딜레이
+            addLog(m);
+            setTimeout(showNext, 1000);
+        } else {
+            // 시스템 메시지 등은 즉시 모두 표시
+            addLog(m);
+            showNext();  // 재귀, 다음 배틀 로그 전까지 즉시
+        }
+    }
+    showNext();
 }
 
 function addLog(msg) {
