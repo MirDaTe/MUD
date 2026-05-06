@@ -1,8 +1,10 @@
 """
 낙화검심 - FastAPI 메인 애플리케이션
 """
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from .core.database import engine, Base
 from .api.endpoints import auth, characters, game, admin
 from .ws.chat import router as ws_router
@@ -22,6 +24,17 @@ app.include_router(characters.router, prefix="/api")
 app.include_router(game.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(ws_router, prefix="/ws")
+
+# 정적 파일 서빙 (프론트엔드)
+FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "../../frontend")
+app.mount("/css", StaticFiles(directory=os.path.join(FRONTEND_DIR, "css")), name="css")
+app.mount("/js", StaticFiles(directory=os.path.join(FRONTEND_DIR, "js")), name="js")
+
+from starlette.responses import FileResponse
+
+@app.get("/")
+def index():
+    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
 
 
 @app.on_event("startup")
