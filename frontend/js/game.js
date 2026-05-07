@@ -96,7 +96,7 @@ async function createChar() {
         insight: +document.getElementById('insight').value,
         charm: +document.getElementById('charm').value,
         luck: +document.getElementById('luck').value
-    };const r = await fetch(`${API}/characters/`, {
+    };const r = await fetch(`${API}/characters`, {
         method:'POST', headers:{'Authorization':`Bearer ${token}`, 'Content-Type':'application/json'},
         body: JSON.stringify(data)
     });
